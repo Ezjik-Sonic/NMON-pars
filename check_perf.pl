@@ -9,7 +9,12 @@ use Benchmark qw(:all) ;
 # use Text::Table;
 
 # Пользоватеьские настройки 
-my $SNAPSHOTS_SHOW="0";
+my $SHOW_SNAPSHOTS="1";
+my $SHOW_time="0";
+my $SHOW_vremya="0";
+
+
+my $CPU_MAX="70";
 
 
 my %LPAR;
@@ -24,16 +29,16 @@ my $cr_end;
 
 # FCXFERTOTAL - сумма FCXFERIN и FCXFEROUT за один снепшот
 
-my @INDICATORS=qw/LPAR MEMNEW PAGING/; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS)
+my @INDICATORS=qw/LPAR CPU_ALL PAGING MEMNEW /; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS)
 my @twice_calc=qw/pbuf/;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
-my @Dev_Adapt=qw//; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
+my @Dev_Adapt=qw/DISKSERV/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
 my @Custom_Metric=qw//; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 
 # my @INDICATORS=qw//; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS)
 # my @twice_calc=qw//;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
 # my @Dev_Adapt=qw/DISKBUSY/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
 
-my $SORTS="MEMNEW"; #  Сортировка
+my $SORTS="LPAR"; #  Сортировка
 my $regex = join ('|', @INDICATORS, @Dev_Adapt, "nothing");
 
 sub general_value{
@@ -100,16 +105,22 @@ sub search_value{
 				if ($load_sum > $result->{$indicator}->{max}) {
 						$result->{$indicator}->{max}=$load_sum;
 						$result->{$indicator}->{max_snap}=$snap;
+						$result->{$indicator}->{vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
 					}
 					$result->{$indicator}->{sum}+=$load_sum;
 					$result->{$indicator}->{count}++;
 			};
 
 			given ($indicator) {
+				# when (/ZZZZ/	) 	{ $load_sum=$load->{"User%"}		+	$load->{"Sys%"};					&$avgsub}
 				when (/^CPU_ALL/  or /^CPU\d\d/	) 	{ $load_sum=$load->{"User%"}		+	$load->{"Sys%"};					&$avgsub}
 				when (/^SCPU_ALL/ or /^SCPU\d\d/) 	{ $load_sum=$load->{"User"}			+	$load->{"Sys"}; 					&$avgsub}
 				when (/^PCPU_ALL/ or /^PCPU\d\d/) 	{ $load_sum=$load->{"User"}			+	$load->{"Sys"}; 					&$avgsub}
-				when (/^LPAR/ 					)	{ $load_sum=$load->{"VP_User%"}		+	$load->{"VP_Sys%"}; 				&$avgsub}
+				when (/^LPAR/ 					)	{ 
+					$load_sum=$load->{"VP_User%"} + $load->{"VP_Sys%"};
+					$result->{$indicator}->{time}++ if ($load_sum > $CPU_MAX);
+					&$avgsub
+				}
 				when (/^MEMNEW/					)	{ $load_sum=100 - $load->{"Free%"}	-	$load->{"FScache%"};				&$avgsub} # 100 - Free - FS cache 
 				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
 				when (/FCXFER/) {
@@ -150,6 +161,7 @@ sub search_value{
 				if ($load_sum > $result->{$Dev_Adapt}->{$device}->{max}) {
 						$result->{$Dev_Adapt}->{$device}->{max}=$load_sum;
 						$result->{$Dev_Adapt}->{$device}->{max_snap}=$snap;
+						$result->{$Dev_Adapt}->{$device}->{vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
 					}
 				$result->{$Dev_Adapt}->{$device}->{sum}+=$load_sum;
 				$result->{$Dev_Adapt}->{$device}->{count}++;
@@ -284,6 +296,8 @@ sub output {
 	my $avg=$indicator->{avg};
 	my $max=$indicator->{max}||"0";
 	my $snap=$indicator->{max_snap};
+	my $time=$indicator->{time};
+	my $vremya=$indicator->{vremya};
 	# my $min=$indicator->{min};
 	$skip_avg=$skip if (! defined $skip_avg);
 	# print "skip_avg=$skip_avg\n";
@@ -301,7 +315,9 @@ sub output {
 		elsif 	($max > $warn_max) 	{ print 			YELLOW, "/$max","$postfix)",	RESET }
 		else 					 	{ print 			GREEN,  "/$max","$postfix)",	RESET }
 	}else {print ")"}
-	print " $snap" if ($SNAPSHOTS_SHOW == 0) and (defined $snap );
+	print " $snap" 	if ($SHOW_SNAPSHOTS == 0)	and (defined $snap );
+	print " x$time" if ($SHOW_time		== 0) 	and (defined $time );
+	print " $vremya" if ($SHOW_vremya	== 0) 	and (defined $vremya );
 }
 
 
@@ -316,7 +332,7 @@ sub value_for_metricks {
 	return("60", "90", ,"40", "70", "SCPU",	"%",	"0"	)		if ( $ind eq "SCPU_ALL"	);
 	return("60", "90", ,"40", "70", "PCPU",	" core","0"	)		if ( $ind eq "PCPU_ALL"	);
 # =========== MEM ================
-	return("90", "70", "90", "70", "MEM", "%", "0"		)		if ( $ind eq "MEMNEW"	);
+	return("80", "70", "80", "70", "MEM", "%", "0"		)		if ( $ind eq "MEMNEW"	);
 # =========== Page ===============
 	return("512", "70", "512", "70", "PageSp", "MB", "0")		if ( $ind eq "PAGING"	);
 
@@ -324,7 +340,7 @@ sub value_for_metricks {
 	return("1000", "70", "512", "70", "Pbuf", " IO blocks", "0")	if ( $ind eq "pbuf"	);
 # =========== DISK ===============
 	return("70",		"50",		"70",		"50",		"$device",	" %",	"60"		)		if ( $ind eq "DISKBUSY"	);
-	return("100",		"50",		"15",		"5",		"$device",	" ms",	"50", "5"	)		if ( $ind eq "DISKSERV");
+	return("100",		"50",		"15",		"5",		"$device",	" ms",	"1000", "10"	)		if ( $ind eq "DISKSERV");
 	return("2",			"1",		"2",		"1",		"$device",	" ms",	"0.1"		)		if ( $ind eq "DISKWAIT");
 	return("100000",	"100000",	"100000",	"100000",	"$device",	" IOs",	"0"			)		if ( $ind eq "DISKXFER");
 # =========== NET ===========
@@ -442,7 +458,7 @@ PARSE:	while (<NMON>) {
 			}
 
 			# Сбор snapshots, выполняется только после того как создана структ
-		    if  ( /^($regex)/os) {
+		    if  ( /^($regex)/os or /ZZZZ/os) {
 		    	# print $_,"\n";
 				if 		( /^\w+\d{0,2},T\d?/os 		)	{fill_structure		(\%lparname,  $_)	}
 				elsif 	( ! /^(AAA|\w+\d{0,2},T\d?)/os)	{structure_create	(\%lparname,  $_)	}
@@ -460,9 +476,9 @@ PARSE:	while (<NMON>) {
 		# print "begin: $pbuf_begin, finish: $pbuf_finish", "\n";
 	search_value(\%lparname);
 	close NMON or warn $! ? "Error closing sort pipe: $!" : "Exit status $? from sort";
+	# print Dumper(\%lparname);
 	undef $lparname{SNAPSHOTS};
 	push(@sorts, $lparname{RESULT});
-	# print Dumper(\%lparname);
 	}
 	# print Dumper(\@sorts);
 	report1(\@sorts);
