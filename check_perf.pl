@@ -34,11 +34,15 @@ my @twice_calc=qw/pbuf/;	# Список метрик для которых ес�
 my @Dev_Adapt=qw/DISKSERV/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
 my @Custom_Metric=qw//; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 
-# my @INDICATORS=qw//; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS)
-# my @twice_calc=qw//;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
-# my @Dev_Adapt=qw/DISKBUSY/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
+# Все возможные
+# my @INDICATORS=qw/LPAR CPU_ALL SCPU_ALL PCPU_ALL PAGING MEMNEW FCREAD FCWRITE FCXFERIN FCXFEROUT/; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS)
+# my @twice_calc=qw/pbuf/;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
+# my @Dev_Adapt=qw/NETERROR DISKBUSY DISKSERV DISKAVGWIO DISKWAIT NETERROR DISKXFER/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
+# my @Custom_Metric=qw/ FCRATIORW/; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 
-my $SORTS="LPAR"; #  Сортировка
+# my $SORTS="LPAR"; #  Сортировка
+my $SORTS="LPARNAME"; #  Сортировка
+
 my $regex = join ('|', @INDICATORS, @Dev_Adapt, "nothing");
 
 sub general_value{
@@ -350,8 +354,8 @@ sub value_for_metricks {
 	return("1400",	"600",	"1400", "600",	"FCXFEROUT",	" IOs",	"0")		if ( $ind eq "FCXFEROUT"	);
 	return("50000",	"25000","80000","25000","FCREAD",		" KBs",	"0")		if ( $ind eq "FCREAD"		);
 	return("10000",	"8000",	"10000","8000", "FCWRITE",		" KBs",	"0")		if ( $ind eq "FCWRITE"		);
-	return("1400",	"1000",	"1400",	"600",	"FCXFERTOTAL",	" IOs",	"0")		if ( $ind eq "FCXFERTOTAL"	);
-	return("50",	"50",	"50",	"50",	"FCRATIORW", 	" %",	"0")		if ( $ind eq "FCRATIORW"	);
+	return("1400",	"1000",	"1400",	"600",	"FCXFERTOTAL",	" IO",	"0")		if ( $ind eq "FCXFERTOTAL"	);
+	return("100",	"100",	"100",	"100",	"Read/Write", 	" %",	"0")		if ( $ind eq "FCRATIORW"	);
 	
 }
 
@@ -360,9 +364,9 @@ sub value_for_metricks {
 sub report1{ 
 	my $sorts=shift;
 	my @new_arr;
-	@new_arr=sort  { $b->{$SORTS}{max} <=> $a->{$SORTS}{max} } @{$sorts}; # SORTS - a global value , metric by sorting
+	# @new_arr=sort  { $b->{$SORTS}{max} <=> $a->{$SORTS}{max} } @{$sorts}; # SORTS - a global value , metric by sorting
 	# @new_arr=sort  { $b->{$SORTS}{avg} <=> $a->{$SORTS}{avg} } @{$sorts}; # SORTS - a global value , metric by sorting
-	# @new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts}; # SORTS - a DATA
+	@new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts}; # SORTS - a DATA
 	foreach (@new_arr) {
 		my $count=0; # Число выведенных метрик
 		my $max_on_line=5;
@@ -475,8 +479,8 @@ PARSE:	while (<NMON>) {
 		} 
 		# print "begin: $pbuf_begin, finish: $pbuf_finish", "\n";
 	search_value(\%lparname);
-	close NMON or warn $! ? "Error closing sort pipe: $!" : "Exit status $? from sort";
 	# print Dumper(\%lparname);
+	close NMON or warn $! ? "Error closing sort pipe: $!" : "Exit status $? from sort";
 	undef $lparname{SNAPSHOTS};
 	push(@sorts, $lparname{RESULT});
 	}
