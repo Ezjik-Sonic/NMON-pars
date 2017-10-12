@@ -40,8 +40,8 @@ my @Custom_Metric=qw//; # Пользовательские метрики, со�
 # my @Dev_Adapt=qw/NETERROR DISKBUSY DISKSERV DISKAVGWIO DISKWAIT NETERROR DISKXFER/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
 # my @Custom_Metric=qw/ FCRATIORW/; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 
-# my $SORTS="LPAR"; #  Сортировка
-my $SORTS="LPARNAME"; #  Сортировка
+my $SORTS="LPAR"; #  Сортировка
+# my $SORTS="LPARNAME"; #  Сортировка
 
 my $regex = join ('|', @INDICATORS, @Dev_Adapt, "nothing");
 
@@ -364,9 +364,9 @@ sub value_for_metricks {
 sub report1{ 
 	my $sorts=shift;
 	my @new_arr;
-	# @new_arr=sort  { $b->{$SORTS}{max} <=> $a->{$SORTS}{max} } @{$sorts}; # SORTS - a global value , metric by sorting
+	@new_arr=sort  { $b->{$SORTS}{max} <=> $a->{$SORTS}{max} } @{$sorts}; # SORTS - a global value , metric by sorting
 	# @new_arr=sort  { $b->{$SORTS}{avg} <=> $a->{$SORTS}{avg} } @{$sorts}; # SORTS - a global value , metric by sorting
-	@new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts}; # SORTS - a DATA
+	# @new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts}; # SORTS - a DATA
 	foreach (@new_arr) {
 		my $count=0; # Число выведенных метрик
 		my $max_on_line=5;
