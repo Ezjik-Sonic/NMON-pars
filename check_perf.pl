@@ -13,16 +13,21 @@ use Pod::Usage;
 use JSON;
 use Scalar::Util qw(looks_like_number);
 
+
+my $YES=1;
+my $NO=0;
+
+
 my $tinit;
 my $tinit_fin;
 my $tdif_init;
 $tinit = Benchmark->new ;
 
 
-# Пользоватеьские настройки  1 - off, 0 - on
-my $SHOW_SNAPSHOTS="1";
-my $SHOW_time="0";
-my $SHOW_vremya="0";
+# Пользоватеьские настройки ;
+my $SHOW_SNAPSHOTS	="$NO";
+my $SHOW_time		="$YES";
+my $SHOW_vremya		="$NO";
 
 my $verbose="0";
 my $bench="0";
@@ -30,48 +35,50 @@ my $CPU_MAX="70";
 my $man = 0;
 my $help = 0;
 my $sAVG_MAX="max";
+my $CVS_FROMATE=$NO;
+
 
 # Хеши для основных данных
 my %LPAR, my %VIOS, my %SERVER;
-
+my $type="general";
+my $delimetr="\t";
 
 # Metrics what have depends of others
 # FCRATIORW - FCWRITE FCREAD
 # FCTOTALGB - FCWRITE FCREAD
 # FCXFERTOTAL - FCXFEROUT FCXFERIN
 
-# ------ Создать 
-# runnable
+
+
 
 # Переменные для форматирования вывода !!! Все заточено под моник 24'
-my $max_on_line_dev, my $indent_device;
+my $max_on_line_dev, 	my $indent_device;
 my $max_on_line_snapsh, my $indent_metrics;
 my $new_line_before_device;
 
 # Defaults 
 my $sort_num;
-# my $SORTS="LPAR"; #  Сортировка  
 my $SORTS_tmp; #  Сортировка  
 my @INDICATORS;
 my @twice_calc;
 my @Dev_Adapt;
 my @Custom_Metric;
-my $type="general";
-my $dump=0;
-my $requiered_gather=0;
+my $dump=$NO;
+my $requiered_gather=$NO;
 my @files, my @json;
 my $user_dev=" ", my $user_iden=" ", my $user_cust=" "; # Если пользователь выбирает метрики вручную
 my $zero=0; # Вывод метрик с 0 
 my $no_new_line=0, my $max_dev, my $max_snap;
 
-
 if ( !@ARGV ) {  pod2usage(1)  }
 GetOptions (
-	"f|files=s{1,}"					=> \@files,
+	"files=s{1,}"					=> \@files,
 	"j|json=s{1,}"					=> \@json,
 	"g|gather"						=> \$requiered_gather,
 	"s|sort=s"						=> \$SORTS_tmp,
 	"t|type=s"						=> \$type,
+	"cvs"							=> \$CVS_FROMATE,
+	"F=s"							=> \$delimetr,
 	"dev|device=s{1,}"				=> \$user_dev,
 	"id|identificator=s{1,}"		=> \$user_iden,
 	"cu|custom=s{1,}"				=> \$user_cust,
@@ -96,7 +103,9 @@ $tstart = Benchmark->new  								if ($bench == 1);
 
 
 my $SORTS=$SORTS_tmp||"name"; #  Сортировка  
-
+my @custom_all=qw/FCRATIORW FCTOTALGB FCXFERTOTAL/;
+my @indicator_all=qw/LPAR CPU_ALL SCPU_ALL PCPU_ALL PAGING MEMNEW FCREAD FCWRITE FCXFERIN FCXFEROUT IOADAPT/;
+my @twice_calc_all=qw/pbuf/;
 # Набор готовых шаблонов - Если пользователь не выбрал ни одного выводим general
 given ($type) {
 	when ( /neterror/i) {
@@ -109,12 +118,12 @@ given ($type) {
 		$new_line_before_device=1, $indent_device=4, $max_on_line_snapsh=5, $indent_metrics=4;
 	}
 	when (/general/i) {
-		@INDICATORS=qw/LPAR CPU_ALL PAGING MEMNEW/;
+		@INDICATORS=qw/LPAR CPU_ALL PAGING MEMNEW PROC/;
 		@twice_calc=qw/pbuf/;
 		@Dev_Adapt=qw/DISKSERV/;
 		$SORTS=$SORTS_tmp||"LPAR";
 		@Custom_Metric=qw//;
-		$new_line_before_device=0, $indent_device=1, $max_on_line_snapsh=5, $indent_metrics=1;
+		$new_line_before_device=0, $indent_device=1, $max_on_line_snapsh=6, $indent_metrics=1;
 	}
 	when ( /disk/i) {
 		@INDICATORS=qw/FCREAD FCWRITE IOADAPT FCXFERIN FCXFEROUT/;
@@ -139,7 +148,6 @@ given ($type) {
 		@Custom_Metric=split/ /,"$user_cust"||qw//;
 		$new_line_before_device =  $no_new_line eq '0' ? '1' : '0' ; # Если нету опции -nl
 		$indent_device=4, $max_on_line_snapsh=5, $indent_metrics=2;
-
 	}
 	default {print "Неправильное значения Типа"}
 };
@@ -190,7 +198,10 @@ sub save_json{
 sub open_json{
 	my @sorts;
 	my $FILE_PATH;
+	my $cc=1;
+	my $json= scalar @json;
 	foreach (@json) {
+		print "$_: Обработано файлов...............", $cc++, " из $json  \n" ;
 		# print Dumper($_);
 		open my $fh, "<", "$_";
 		# open(JSON, "<:utf8", "$_") or die "Can't open this file $!\n";
@@ -220,7 +231,7 @@ sub choice_indent{
 # my @Dev_Adapt=qw/DISKSERV/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
 # my @Custom_Metric=qw//; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 my $regex;
-sub create_regex{ $regex = join ('|', @INDICATORS, @Dev_Adapt, "nothing") }
+sub create_regex{ $regex = join ('|', @INDICATORS, @Dev_Adapt, "ZZZZ") }
 
 sub general_value{
 	my @a_cap;
@@ -241,7 +252,7 @@ sub general_value{
 sub structure_create {
 	my $lparname=shift;
 	my $string=shift;
-	my $gather=shift||0;
+	my $gather=shift||$NO;
 	my $snapshots=\%{$lparname->{SNAPSHOTS}};
 	my $result=\%{$lparname->{RESULT}};
 	my @tmp=map s/\s//rg, split/,/,"$string";
@@ -254,7 +265,7 @@ sub structure_create {
 	foreach ( @a_cap ) { 
 		%{$lparname->{RESULT}->{$tmp[0]}{$_}} = general_value  ;
 	}
-	push(@Dev_Adapt, $tmp[0]) if ($gather eq 1)
+	push(@Dev_Adapt, $tmp[0]) if ($gather == $YES)
 }
 
 sub fill_structure {
@@ -303,18 +314,20 @@ sub search_value{
 			};
 
 			given ($indicator) {
+
 # Нестандартный подсчет значений
 				# when (/ZZZZ/	) 	{ $load_sum=$load->{"User%"}		+	$load->{"Sys%"};					&$avgsub}
 				when (/^CPU_ALL/  or /^CPU\d\d/	) 	{ $load_sum=$load->{"User%"}		+	$load->{"Sys%"};					&$avgsub}
 				when (/^SCPU_ALL/ or /^SCPU\d\d/) 	{ $load_sum=$load->{"User"}			+	$load->{"Sys"}; 					&$avgsub}
 				when (/^PCPU_ALL/ or /^PCPU\d\d/) 	{ $load_sum=$load->{"User"}			+	$load->{"Sys"}; 					&$avgsub}
+				when (/^MEMNEW/					)	{ $load_sum=100 - $load->{"Free%"}	-	$load->{"FScache%"};				&$avgsub} # 100 - Free - FS cache 
+				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
+				when (/^PROC$/					)	{ $load_sum=$load->{"Runnable"}; 											&$avgsub}
 				when (/^LPAR/ )	{ 
 					$load_sum=$load->{"VP_User%"} + $load->{"VP_Sys%"};
 					$result->{$indicator}->{time}++ if ($load_sum > $CPU_MAX);
 					&$avgsub
 				}
-				when (/^MEMNEW/					)	{ $load_sum=100 - $load->{"Free%"}	-	$load->{"FScache%"};				&$avgsub} # 100 - Free - FS cache 
-				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
 				when (/^FCXFER/) {
 					foreach ( keys %{$load}) {
 						$load_sum=$load->{$_};
@@ -353,6 +366,7 @@ sub search_value{
 					}
 				$result->{$Dev_Adapt}->{$device}->{sum}+=$load_sum;
 				$result->{$Dev_Adapt}->{$device}->{count}++;
+				# print "$snap\tmin -> $result->{$Dev_Adapt}->{$device}->{min_vremya}\tmax -> $result->{$Dev_Adapt}->{$device}->{vremya}\n" if ($device eq "fcs2_read-KB/s");
 			};
 			given ( $Dev_Adapt ) {
 # Для подсчета требуются доп действия
@@ -367,6 +381,7 @@ sub search_value{
 				default {
 					foreach ( keys %{$load}) {
 						$load_sum=$load->{$_};
+						# print "$Dev_Adapt - $_  - $load_sum\n";
 						$result->{$Dev_Adapt}->{$_}->{avg}=$load_sum and next if (! looks_like_number($load_sum));
 						$load_sum=0 if ( $load_sum eq "");
 						next if ($load_sum <= "0");
@@ -375,39 +390,26 @@ sub search_value{
 				}
 			}
 		}
-		foreach my $metric ( @Custom_Metric ) {
-			my $load=$result->{$metric};
-			my $avgsub = sub { 
-				if ($load_sum > $result->{$metric}->{max}) {
-						$result->{$metric}->{max}=$load_sum;
-						$result->{$metric}->{max_snap}=$snap;
-					}
-				if ($load_sum < $result->{$metric}->{min}) {
-						$result->{$metric}->{min}=$load_sum;
-						$result->{$metric}->{min_snap}=$snap;
-					}
-					$result->{$metric}->{sum}+=$load_sum;
-					$result->{$metric}->{count}++;
-			};
-			given ( $metric ) {
-				# Сложить IO со всех адаптеров следующих метрик FCXFERIN и FCXFEROUT
-				when (/FCXFERTOTAL/){ $result->{$metric}->{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}->{sum}+	$result->{FCXFERIN}->{sum}));	}
-				when (/FCTOTALGB/) 	{ $result->{$metric}->{avg}=eval(sprintf("%.2f",($result->{FCWRITE}->{sum} 	+ 	$result->{FCREAD}->{sum})/1024/1024));					}
-				when (/FCRATIORW/) 	{ # Сложить IO со всех адаптеров следующих метрик FCXFERIN и FCXFEROUT
-						$result->{$metric}->{max}=eval(sprintf("%.2f",$result->{FCWRITE}->{sum} * 100 /($result->{FCREAD}->{sum}+$result->{FCWRITE}->{sum})));
-						$result->{$metric}->{avg}=100-$result->{$metric}->{max};
-				}
-			}
-		}		
 	}
 
+# Postprocessing	
 	foreach ( @twice_calc) {
 		my $ref=$result->{$_};
 		given ($_) {
 			when (/pbuf/) {$result->{pbuf}{avg}=$tmp_ref->{pbuf}->{"pbuf_finish"} - $tmp_ref->{pbuf}->{"pbuf_begin"}} # Скоколько накапало за один день
 		}
 	}
-# Postprocessing	
+	foreach ( @Custom_Metric) {
+		my $ref=$result->{$_};
+		given ($_) {
+			when (/FCXFERTOTAL/){ $result->{$_}->{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}->{sum}+	$result->{FCXFERIN}->{sum}));	}
+			when (/FCTOTALGB/) 	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{FCWRITE}->{sum} 	+ 	$result->{FCREAD}->{sum})/1048576));					}
+			when (/FCRATIORW/) 	{ # Сложить IO со всех адаптеров следующих метрик FCXFERIN и FCXFEROUT
+					$result->{$_}->{max}=eval(sprintf("%.2f",$result->{FCWRITE}->{sum} * 100 /($result->{FCREAD}->{sum}+$result->{FCWRITE}->{sum})));
+					$result->{$_}->{avg}=eval(sprintf("%.2f",100-$result->{$_}->{max}));
+			}
+		}
+	}
 	foreach ( @INDICATORS){
 		$result->{$_}->{"avg"}=eval(sprintf("%.2f",$result->{$_}->{"sum"} / $result->{$_}->{"count"}))
 	}
@@ -434,7 +436,7 @@ sub server_strcture {
 }
 
 sub lparname_structure{
-	my $lparname=shift,	my $data=shift, my $SerialNumber=shift, my $LPAR=shift, my $filename=shift;
+	my $lparname=shift,	my $data=shift, my $SerialNumber=shift, my $LPAR=shift, my $filename=shift, my $cpus=shift;
 	my %cpu,my %scpu,my %pcpu, my %lpar_stats;
 	my %snapshots;
 	my %result;
@@ -446,6 +448,7 @@ sub lparname_structure{
 	$result{Data}=			$data=~ s/-//gr;
 	$result{ID}=			"$result{Data}$LPAR";
 	$result{FILENAME}=		$filename;
+	$result{CPUS}=			$cpus;
 	$result{ZZZZ}{a_cap}=	\@ZZZZ;
 	$lparname->{SNAPSHOTS}=	\%snapshots;
 	$lparname->{RESULT}=	\%result;
@@ -464,29 +467,54 @@ sub output {
 
 	$skip_avg=$skip if (! defined $skip_avg); 
 
-	print "\t$prefix(",	GREEN,	"$avg",	"$postfix",	RESET,")" and return 1 if (! looks_like_number($avg)); # if a word
 
-	return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
+	if ( $CVS_FROMATE == $NO)
+	{
+		print "${delimetr}${prefix}(",	GREEN,	"$avg",	"$postfix",	RESET,")" and return 1 if (! looks_like_number($avg)); # if a word
+		return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
 
-	if 		($avg > $crit_avg)	{ print "\t$prefix(", 	RED,	"$avg", "$postfix",	RESET }
-	elsif 	($avg > $warn_avg)	{ print "\t$prefix(", 	YELLOW,	"$avg", "$postfix",	RESET }
-	else 						{ print "\t$prefix(",	GREEN,	"$avg",	"$postfix",	RESET }
-	if ( $max > "0") {
-		if 		($max > $crit_max) 	{ print 			RED, 	"/$max","$postfix)",	RESET }
-		elsif 	($max > $warn_max) 	{ print 			YELLOW, "/$max","$postfix)",	RESET }
-		else 					 	{ print 			GREEN,  "/$max","$postfix)",	RESET }
-	}else {print ")"}
-	print " $snap" 	if ($SHOW_SNAPSHOTS == 0)	and (defined $snap 	);
-	print " x$time" if ($SHOW_time		== 0) 	and (defined $time 	);
-	print " $vremya"if ($SHOW_vremya	== 0) 	and (defined $vremya);
-	return 1
+		if 		($avg > $crit_avg)	{ print "${delimetr}${prefix}(", 	RED,	"$avg", "$postfix",	RESET }
+		elsif 	($avg > $warn_avg)	{ print "${delimetr}${prefix}(", 	YELLOW,	"$avg", "$postfix",	RESET }
+		else 						{ print "${delimetr}${prefix}(",	GREEN,	"$avg",	"$postfix",	RESET }
+		if ( $max > "0") {
+			if 		($max > $crit_max) 	{ print 			RED, 	"/$max","$postfix)",	RESET }
+			elsif 	($max > $warn_max) 	{ print 			YELLOW, "/$max","$postfix)",	RESET }
+			else 					 	{ print 			GREEN,  "/$max","$postfix)",	RESET }
+		}else {print ")"}
+		print "x$time" if ($SHOW_time		== $YES) 	and (defined $time 	);
+		print "_$snap" 	if ($SHOW_SNAPSHOTS == $YES)	and (defined $snap 	);
+		print "_$vremya"if ($SHOW_vremya	== $YES) 	and (defined $vremya);
+		return 1
+	} else {
+		print ",$avg";
+		return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
+		print ",$max" if ($max > "0");
+	}
+}
+
+sub save_cvs{
+	my $INDICATORS=shift;
+	my $twice_calc=shift;
+	my $Dev_Adapt=shift;
+	my $metrics=shift;
+######## Печатаем шапку
+	print "Date,Serial,hostname";
+	map {print ",avg-$_,max-$_" } @{$INDICATORS};
+	map {print ",$_" } @{$twice_calc};
+	foreach my $dev (@{$Dev_Adapt}) { map { print ",dev-avg-$_,dev-max-$_" } sort @{$metrics->{$dev}->{a_cap}}};
+	print "\n";
+######################################################### 
+
 }
 
 # Шаблоны ток для основных параметров
 sub value_for_metricks {
-	my $ind=	shift;
-	my $device=	shift||"$ind";
-	# print $device;
+	my %metrics=@_;
+	# print Dumper(\%metrics);
+	my $ind=	$metrics{IND};
+	my $device=	$metrics{DEV}||"$ind";
+	my $cpus=	$metrics{CPUS}||0;
+	# print "ind - $ind\tdevice - $device\tcpus - $cpus";
 # Среднее критическое, Среднее предупреждение, Критическое максиммальное, Предупредение максимальное, префикс, постфикс, skip
 # =========== CPU ================
 	return("60", "50", ,"90", "60", "$device", 	"%",	"0"	)										if ( $ind eq "CPU_ALL"	);	
@@ -518,11 +546,11 @@ sub value_for_metricks {
 	return("100",	"100",	"100",	"100",	"Read/Write", 	" %",	"0")							if ( $ind eq "FCRATIORW");
 # ============= IOADAPT ========================
 	return("100000",		"80000",		"100000",	"80000",		"$device",	"",	"0"	)		if ( $ind eq "IOADAPT"	);
+# ============= PROC ========================
+	return($cpus/1.3,		$cpus/2,		$cpus/1.3,	$cpus/2,		"$device",	"",	"0"	)		if ( $ind eq "PROC"	);
 # ============= Хотелось бы знать что именно пользователь хочет вывести, но мы не знаем, так что, просто нечего не раскрашиваем
 	return("99999999999",	"99999999999",	"99999999999",	"99999999999",	"$device",	"",	"0");
 
-
-	
 }
 
 
@@ -532,10 +560,10 @@ sub report1{
 	my @new_arr;
 	@new_arr=sort  { $b->{$SORTS}{$sAVG_MAX} <=> $a->{$SORTS}{$sAVG_MAX} } @{$sorts} 	if ($sort_num == 1); # SORTS - a global value , metric by sorting
 	@new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts} 							if ($sort_num == 0); # SORTS - a DATA (string line)
-
+	my $was_shown_cover=$NO;
+	my $show_cover_each_line=$NO;
 	foreach (@new_arr) {
 		my $count=1; # Число выведенных метрик
-
 		# Стандартные значения которые должна содержать каждая LPAR
 		my $ID=$_->{ID};
 		my $sn=$_->{SN};
@@ -543,6 +571,7 @@ sub report1{
 		my $lparname=$_->{LPARNAME};
 		##############################################
 		my $lpar_ref=$_; # ссылка на LPAR
+		my $cpus=$lpar_ref->{CPUS};
 		my %metrics; # Сылки на метрики
 		my @full_array=(@INDICATORS, @twice_calc, @Dev_Adapt, @Custom_Metric);
 		my @snapshots=(@INDICATORS, @twice_calc,@Custom_Metric);
@@ -550,14 +579,20 @@ sub report1{
 		my @keys=(keys %{$_});
 		foreach (@full_array) {if ( $_ ~~ @keys ) {$metrics{$_}=$lpar_ref->{$_}}}
 
+		if ($CVS_FROMATE==$YES and $was_shown_cover == $NO or $show_cover_each_line == $YES  ) {	
+			save_cvs(\@INDICATORS,\@twice_calc, \@Dev_Adapt,\%metrics);  
+			$was_shown_cover=$YES; 
+		}
 		print "$date";
-		print " $sn";
-		print " $lparname","\n"x$new_line_before_device,"\t"x$indent_metrics;
-		# printf "\tЗагрузка(avg/max)";
+		if ($CVS_FROMATE==$NO)	{print " $sn $lparname","\n"x$new_line_before_device,"${delimetr}"x$indent_metrics; } 
+		else 					{print ",$sn,$lparname","\n"x$new_line_before_device;								}
+
 		foreach ( @snapshots ) {
 			# print "__${count}__";
-			print "\n","\t"x$indent_metrics and $count=2 if ( $count++ > $max_on_line_snapsh);
-			print ""; output($metrics{$_}, value_for_metricks($_));
+			print "\n","$delimetr"x$indent_metrics and $count=2 if ( $count++ > $max_on_line_snapsh);
+			print ""; output($metrics{$_}, value_for_metricks(IND => $_, CPUS => $cpus))
+			# if ($CVS_FROMATE==$NO) { print ""; output($metrics{$_}, value_for_metricks(IND => $_, CPUS => $cpus)) }
+			# else { print_cvs($metrics{$_}) }
 		}
 		# $count=0;
 		foreach ( @Dev_Adapt ) {
@@ -565,20 +600,24 @@ sub report1{
 			$count=1; 
 			#  Делаем начальный отступ и пишем имя метрики
 			my $device=$_;
-			print "\n" if ($new_line_before_device == 1) ;
-			print "","\t"x$indent_device, $device,":\n"x$new_line_before_device,"\t"x$indent_device;
-
-			foreach (sort ( @{$metrics{$device}{"a_cap"}})) {
-				my $result=output($metrics{$device}{$_}, value_for_metricks($device, $_));
-				# print "-------------${count}-----------";
-				print "\n","\t"x$indent_device and $count=1 if ( ($count=$result + $count) > $max_on_line_dev);
-			}
-			print "\n" if ($new_line_before_device == 1) ;
+			print "\n" if ($new_line_before_device == $YES) ;
+			print "","$delimetr"x$indent_device, $device,":\n"x$new_line_before_device,"$delimetr"x$indent_device if ($CVS_FROMATE==$NO);
+			my $result=undef;
+			if ( exists ($metrics{$device}{"a_cap"}[0])) {
+				foreach (sort ( @{$metrics{$device}{"a_cap"}})) {
+					$result=output($metrics{$device}{$_}, value_for_metricks(IND =>$device, DEV => $_, CPUS => $cpus));
+					# else { $result=print_cvs($metrics{$device}{$_}); }
+					print "\n","$delimetr"x$indent_device and $count=1 if ( ($count=$result + $count) > $max_on_line_dev);
+				}
+				} else { print "$delimetr"x$indent_device ,"0"}
+			print "\n" if ($new_line_before_device == $YES) ;
 		}
 		print "\n";
 
 	}
 }
+
+
 sub parse_nmon{
 	my @sorts;
 	my $files= scalar @files;
@@ -598,8 +637,9 @@ sub parse_nmon{
 		my $pbuf_begin=undef, my $pbuf_finish=undef;
 		my $BBSEA;
 		my $finished_gather=0;
+		my $cpus;
 		
- 		if ($requiered_gather eq 1) { @INDICATORS=(), @twice_calc=(), @Custom_Metric=()	} # Each step we clar array for new file
+ 		if ($requiered_gather eq $YES ) { @INDICATORS=(); @twice_calc=(); @Custom_Metric=(); @Dev_Adapt=();	} # Each step we clуar array for new file if --gather 
  		create_regex;
 		my $tparse0, my $tparse1, my $tdparse 				if ($bench == 1);
 		$tparse0 = Benchmark->new 							if ($bench == 1);
@@ -607,9 +647,10 @@ PARSE:	while (<NMON>) {
 		    chomp;                  # no newline
 		    if (!exists $SERVER{$data}{$SerialNumber}{$lparname}) {
 			    $data=$_ 		 =~ s/^AAA,date,//r 																		and next PARSE	if /^AAA,date,/os;
+			    $cpus=$_ 		 =~ s/^AAA,cpus,\d+,(\d+)/$1/r 																and next PARSE	if /^AAA,cpus,/os;
 			    $SerialNumber=$_ =~ s/^AAA,SerialNumber,//r 																and next PARSE	if /^AAA,SerialNumber,/os;
 				$lparname=$_ 	 =~ s/^AAA,NodeName,//r																		and
-				$SERVER{$data}{$SerialNumber}{$lparname}=lparname_structure(\%lparname, $data, $SerialNumber, $lparname, $filename)	and next PARSE 	if /^AAA,NodeName,/os;
+				$SERVER{$data}{$SerialNumber}{$lparname}=lparname_structure(\%lparname, $data, $SerialNumber, $lparname, $filename, $cpus)	and next PARSE 	if /^AAA,NodeName,/os;
 			}
 
 			# Данные о размере Paging Space
@@ -630,14 +671,21 @@ PARSE:	while (<NMON>) {
 					next PARSE;
 				}
 			}
-			if ($finished_gather eq 0 and $requiered_gather eq 1) {
-		    	if  (! (/^(AAA|BBB)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
-		    	if  (/^\w+\d{0,2},T0001/)	{$finished_gather=1;  create_regex;		}
+			if ($finished_gather == $NO and $requiered_gather == $YES) {
+				# next PARSE if (/^ZZZZ/);
+		    	if  (! (/^(AAA|BBB|ZZZZ)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
+		    	if  (/ZZZZ,T0001/)	{
+			    	$finished_gather=1; 
+					push(@INDICATORS, @indicator_all);
+					push(@Custom_Metric, @custom_all);
+					push(@twice_calc, @twice_calc_all);
+		    		create_regex;		
+		    	}
 		    	else 						{ next PARSE					    	}
 			}
 			# Сбор snapshots, выполняется только после того как создана структура
 			
-		    if  ( /^($regex)/os or /ZZZZ/os) {
+		    if  ( /^($regex)/os) {
 		    	# print $_,"\n";
 				if 		( /^\w+\d{0,2},T\d?/os 		)	{fill_structure		(\%lparname,  $_)	}
 				elsif 	( ! /^(AAA|\w+\d{0,2},T\d?)/os)	{structure_create	(\%lparname,  $_)	}
@@ -668,8 +716,6 @@ PARSE:	while (<NMON>) {
 
 		print "Расчет всех снепшотов:",timestr($tdcalc),"\n"  	if ($bench == 1);
 
-
-
 		my $tpush0, my $tpush1, my $tdpush  					if ($bench == 1);
 		$tpush0 = Benchmark->new  								if ($bench == 1);
 
@@ -678,8 +724,11 @@ PARSE:	while (<NMON>) {
 		$tpush1 = Benchmark->new  								if ($bench == 1);
 		$tdpush = timediff($tpush1, $tpush0)  					if ($bench == 1);
 		print "push NMON Files",timestr($tdpush),"\n"  			if ($bench == 1);
-		my $size_dev=scalar @Dev_Adapt  						if ($verbose == 2);
-		print "Размер @Dev_Adapt = $size_dev\n"  				if ($verbose == 2);
+		my $size_dev=scalar @Dev_Adapt  						if ($verbose == 1);
+		my $size_ind=scalar @INDICATORS  						if ($verbose == 1);
+		print "Размер @Dev_Adapt = $size_dev\n"  				if ($verbose == 1);
+		print "Размер @INDICATORS = $size_ind\n"  				if ($verbose == 1);
+		print "\n"												if ($verbose == 1);
 	}
 	return @sorts;
 }
@@ -693,6 +742,12 @@ print "Time to prepare",timestr($tdif_init),"\n" 				if ($bench == 1);
 {
 	# Создаем массив файлов
 	# my (@files)=@ARGV;
+
+	my @sorts;
+	@sorts=parse_nmon 		if (@files);
+	@sorts=open_json 		if (@json);
+	print Dumper(\@sorts) 	if ($dump==1);
+	save_json(\@sorts) 		if ($requiered_gather==$YES);
 	if ($verbose == 1) {
 		print "Настройки сортировки:","\n";
 		print "\t","Sorts - $SORTS","\n\t", "sAVG_MAX = $sAVG_MAX","\n";
@@ -701,15 +756,9 @@ print "Time to prepare",timestr($tdif_init),"\n" 				if ($bench == 1);
 		print "Выбранные метрики:","\n";
 		print "\t","INDICATORS = @INDICATORS","\n\t", "twice_calc = @twice_calc","\n\t", "Dev_Adapt = @Dev_Adapt","\n\t", "Custom_Metric = @Custom_Metric","\n";
 	}
-	my @sorts;
-	@sorts=parse_nmon 		if (@files);
-	@sorts=open_json 		if (@json);
-	print Dumper(\@sorts) 	if ($dump==1);
-	save_json(\@sorts) 		if ($requiered_gather==1);
-
 
 # my $treport = Benchmark->new  									if ($bench == 1);
-	report1(\@sorts) 		if ($requiered_gather==0);
+	report1(\@sorts) 		if ($requiered_gather==$NO);
 # my $tstoprep = Benchmark->new  									if ($bench == 1);
 # my $tdreport = timediff($tstoprep, $treport)  					if ($bench == 1);
 # print "Time to report ",timestr($tdreport),"\n" 		if ($bench == 1);
@@ -717,7 +766,7 @@ print "Time to prepare",timestr($tdif_init),"\n" 				if ($bench == 1);
 }
 $tfinished = Benchmark->new  									if ($bench == 1);
 $tdfinished = timediff($tfinished, $tstart)  					if ($bench == 1);
-print "Finished, time to waste",timestr($tdfinished),"\n" 		if ($bench == 1);
+print "Finished, time to waste",timestr($tdfinished),"\n\n" 	if ($bench == 1);
 
 
 
@@ -750,40 +799,65 @@ Example: check_perf.pl -f /path/to/dir/file* -s LPAR -t general --dump
 
 =head2 OPTIONS
 
-   -help -h        brief help message
-   -man            full documentation
-   -files -f       Список NMON которые необходимо проверить. К примеру /NMON/18021[678]/* 
-   -json  -j       Список JSON которые необходимо проверить. К примеру /JSON/18021[678]/* 
-   -sort  -s       Выбор столбца для сортировки. По умолчанию LPAR. 
-                   Доступные сортировки:
-                        LPAR - Загрузка CPU с учетов entitled
-                        CPU - Загрзука CPU
-                        MEM - Используемая память
-                        pagesp - Сколько памяти в Page
-                        pbuf - Свидетельствует о недостатки pbuf для VG
-                        DISKSERV - Среднее время дискового ввода-вывода на передачу в миллисекундах.
-                        FCRATIORW - соотношение  IO Чтение/Запись 
-                        time - Дата
-                        serial - Серийный номер оборудования
-                        name - Имя LPAR
-                        !!!!!!!!!!! NETERROR - Ошибки на адаптерах. Возможно доверять этим данным не стоит...
-                        SCPU - 
-                        PCPU - 
-                        DISKBUSY - 
-                        DISKWAIT - 
-                        DISKXFER - 
-                        FCXFERIN - 
-                        FCXFEROUT - 
-                        FCREAD - 
-                        FCWRITE - 
-                        FCXFERTOTAL - 
-   -type  -t        Набор шаблонов для сбора статистики. По умолчанию general.
-                    Доступные шаблоны:
-                    !!!!!!! neterror - Вывод ошибок на сетевых интерфейсах. Возможно доверять этим данным не стоит...
-                    general  - Вывод метрик по LPAR CPU PAGING MEM.
-                    disk     - Вывод метрик по FCTOTALGB FCRATIORW. 
+	-help -h 			brief help message
 
-   -dump           Вывод готового хеша содержащий данные прошедшие сортировку и парсинг.  
+	-man 				full documentation
+
+	-files				Список NMON которые необходимо проверить. К примеру /NMON/18021[678]/* 
+
+	-json -j			Список JSON которые необходимо проверить. К примеру /JSON/18021[678]/* 
+
+	-sort -s			Выбор столбца для сортировки. По умолчанию LPAR. 
+					Предопределенные типы сортировки: LPAR,CPU,MEM,pagesp,pbuf,DISKSERV,FCRATIORW,time,serial,name,SCPU,PCPU,DISKBUSY,DISKWAIT,DISKXFER,FCXFERIN,FCXFEROUT,FCREAD,FCWRITE,FCXFERTOTAL
+					Если в качестве шаблона используются adv, то можно указать любой тип сортировки из собираемых данных
+
+	-type -t 			Набор шаблонов для сбора статистики. По умолчанию general.
+					Доступные шаблоны:
+					neterror 	- Вывод ошибок на сетевых интерфейсах. Возможно доверять этим данным не стоит.
+					general 	- Вывод метрик по LPAR CPU PAGING MEM.
+					disk 		- Вывод метрик по FCTOTALGB FCRATIORW. 
+					adv 		- Не использовать шаблон, задать параметры вручную. Параметры задаются через -id , -dev, -cu
+
+	-dump				Вывод готового хеша содержащий данные прошедшие сортировку и парсинг.  
+
+	-cvs 				Вывод в CVS формате.
+
+	-F 				Разделитель столбцов.
+
+	-dev -device 			Выбор пользовательских метрик типа Dev_Adapt. Необходим ключ -t adv.
+
+	-id -identificator		Выбор пользовательских метрик типа identificator. Необходим ключ -t adv.
+
+	-cu -custom 			Выбор пользовательских метртк типа custom.
+
+	-zero 				Выводить все значения метрик, даже если они ровны 0 или меньше порогового значения.
+
+	-no_new-line -nonl		Все метрики типа Dev_Adapt выводить с новой строки.
+
+	-md 				Количество метрик типа Dev_Adapt в одной строке.
+
+	-ms 				Количестов метрик типа INDICATORS в одной строке.
+
+	-verbose			Подробный вывод.
+
+	-bench 				Benchmarks.
+
+	-gather 			Сбор статистики по всем метрикам которые есть в файле NMON и сохранение их в текущию(./) дирикторию.
+
+
+	На основе NMON файла скрипт создает 4 типа данных которые хранятся в следующих массивах:
+	@twice_calc - Данный массив создан для хранения и обработки метрик которые собираются дважды в начале файле и в конце файла. В NMON файле они хранятся за тегами BBBP
+
+	@Dev_Adapt	- Данный массив хранит значения всех показателей одного индикатора. К примеру если в NMON файле есть индикатор FCREAD, который собирает данные с 4 адаптеров(fc0,fc1,fc2,fc3), 	
+	тогда - статистика будет расчитываться для каждого отдельного показателя.
+
+	@INDICATORS	- Данный массив хранит метрику являющимся средним значением суммы всех показатлей какого либо индикатора. К примеру если в NMON файле есть индикатор FCREAD,
+	который собирает данные с 4 адаптеров(fc0,fc1,fc2,fc3), то статистика будет расчитываться от суммы всех четырех адаптеров. 
+	Так же, для метрик из данного массива могут быть выполнены все операции требующие нестандартных операций на обработке каждого снепшота.  
+	К примеру, 	есть метрика MEMNEW, которая для каждого снепшота выполняет следующее 'when (/^MEMNEW/)	{ $load_sum=100 - $load->{"Free%"} - $load->{"FScache%"}; &$avgsub}'
+
+	@Custom_Metric - Данный массив хранит метрики которые рассчитываются после обработки всех снепшотов к примеру: FCRATIORW - на основе рассчитанных метрик FCREAD FCWRITE расчитывает соотношения операций чтение\запись на диск,  
+	FCTOTALGB и FCXFERTOTAL считает общий объем трафика в GB и IO запросах.
 
 
 =cut
