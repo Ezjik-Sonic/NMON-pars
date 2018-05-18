@@ -1,6 +1,6 @@
 Простой парсер для NMON файлов собранных с систем AIX. 
 
-Для работы парсера сбор NMON должен осуществляться со следущими опциями `-y SCPU=on -y PCPU=on  -s 60 -ydays_file=1 -a 7 -yoverwrite=1 -o /var/nmon/ -T -V -P -M -N -^ -L -A -w 4 -l 150 -I 0.1 -d `
+Для работы парсера сбор NMON должен осуществляться со следущими опциями `-y SCPU=on -y PCPU=on  -s 60 -ydays_file=1 -a 7 -yoverwrite=1 -o /var/nmon/ -T -V -P -M -N -^ -L -A -w 4 -l 150 -I 0.1 -d `  
 Ссылка на парсер - [NMON parser](https://github.com/Ezjik-Sonic/NMON-pars)
 
 
@@ -39,6 +39,39 @@
 
 	08OCT2017 1234568 lparname5	FCXFERIN(2.46 IOs/134.1 IOs) 04:02:53	FCXFEROUT(1.77 IOs/390.1 IOs) 07:01:09	(133.81 KBs/11752.4 KBs) 09:45:26	FCWRITE(106.34 KBs/19688.1 KBs) 02:01:44	Pbuf(61 IO blocks)	Read/Write(55.72 %/44.28 %)
 
+
+
+Вывод данных по дисковой подсистеме, опции "-t disk  --zero".
+-----
+	16MAY2018 21A84C7 lparname
+		FCREAD(1713.75 KBs/74926.5 KBs) FCWRITE(103.12 KBs/4236.4 KBs)  IOADAPT(637.47/74945.9) FCXFERIN(83.47 IOs/1267.2 IOs)  FCXFEROUT(11.57 IOs/104.8 IOs)
+		Pbuf(0 IO blocks)       Read/Write(94.32 %/5.68 %)      FCTOTALGB(9.95 GB)      FCXFERTOTAL(545989.7 IO)
+	IOADAPT:
+		fcs0_read-KB/s(1712.76/74809.9) fcs0_write-KB/s(103.44/3864.4)  fcs0_xfer-tps(94.83/1280.3)
+		fcs1_read-KB/s(1713.65/74707.9) fcs1_write-KB/s(103.76/4045.7)  fcs1_xfer-tps(94.84/1280.3)
+		fcs2_read-KB/s(1714.26/74809.9) fcs2_write-KB/s(102.66/4237.4)  fcs2_xfer-tps(94.83/1282.4)
+		fcs3_read-KB/s(1711.81/74945.9) fcs3_write-KB/s(103.11/3964.6)  fcs3_xfer-tps(94.83/1280.3)
+	DISKBUSY:
+		hdisk0(0.09 %/20.0 %)   hdisk3(0.1 %/3.6 %)     hdisk4(9.66 %/83.3 %)   hdisk5(2.53 %/80.5 %)
+	DISKSERV:
+		hdisk0(1.23 ms/106.7 ms)	hdisk3(1.02 ms/24.0 ms) hdisk4(0.58 ms/13.2 ms) hdisk5(0.76 ms/15.7 ms)
+	DISKWAIT:
+		hdisk0(0 ms)    hdisk3(0 ms)    hdisk4(0 ms)    hdisk5(0.05 ms/0.1 ms)
+	DISKREAD:
+		hdisk0(1566.83 KBs/15014.6 KBs) hdisk3(2.4 KBs/823.4 KBs)       hdisk4(5427.21 KBs/151734.5 KBs)       hdisk5(1284.11 KBs/146371.0 KBs)
+	DISKWRITE:
+		hdisk0(1.01 KBs/208.1 KBs)      hdisk3(6.36 KBs/552.2 KBs)      hdisk4(235.67 KBs/6840.4 KBs)   hdisk5(170.34 KBs/11722.0 KBs)
+
+
+
+
+Вывод только выбранных метрик и индикаторв, опции " -t adv -dev PROC".
+-----
+	PROC:
+		Runnable(0.21/1.40)     Swap-in(0.02/0.08)      asleep_bufio(0) asleep_diocio(0.5/1)
+		asleep_rawio(0) exec(3.17/34)   fork(4.2/49)    msg(0)
+		pswitch(2158.97/16213)  read(53/1022)   sem(0)  syscall(1128.66/11449)
+		write(11.97/164)
 
 
 
@@ -86,3 +119,6 @@ Disk Serv - среднее за сутки метрики DISKSERV, (без уч
 	    Average disk I/O service time per transfer in milliseconds.
 
 
+
+
+ 
