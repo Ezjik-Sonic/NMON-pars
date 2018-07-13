@@ -1,7 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
 use warnings;
-use Data::Dumper::Store;
 use Data::Dumper;
 use feature qw(switch);
 use v5.16;
@@ -31,12 +30,14 @@ my $SHOW_vremya		="$NO";
 
 my $verbose="0";
 my $bench="0";
-my $CPU_MAX="70";
+my $CPU_MAX="99";
 my $man = 0;
 my $help = 0;
 my $sAVG_MAX="max";
 my $CVS_FROMATE=$NO;
-
+my $SHOW_phys_against_entitle=$YES;
+my $SHOW_entitle=$YES;
+my $SHOW_PoolBusy=$YES;
 
 # Хеши для основных данных
 my %LPAR, my %VIOS, my %SERVER;
@@ -108,6 +109,15 @@ my @indicator_all=qw/LPAR CPU_ALL SCPU_ALL PCPU_ALL PAGING MEMNEW FCREAD FCWRITE
 my @twice_calc_all=qw/pbuf/;
 # Набор готовых шаблонов - Если пользователь не выбрал ни одного выводим general
 given ($type) {
+	when ( /silin/i) {
+		@INDICATORS=qw/CPU_ALL MEMNEW IOADAPT NET FCREAD FCWRITE/;
+		@twice_calc=qw//;
+		@Dev_Adapt=qw//;
+		@Custom_Metric=qw/FCRATIORW FCTOTALGB/;
+		$SORTS=$SORTS_tmp||"CPU_ALL";
+		$sort_num="1";
+		$new_line_before_device=0, $indent_device=1, $max_on_line_snapsh=9, $indent_metrics=1;
+	}
 	when ( /neterror/i) {
 		@INDICATORS=qw//;
 		@twice_calc=qw//;
@@ -123,12 +133,21 @@ given ($type) {
 		@Dev_Adapt=qw/DISKSERV/;
 		$SORTS=$SORTS_tmp||"LPAR";
 		@Custom_Metric=qw//;
-		$new_line_before_device=0, $indent_device=1, $max_on_line_snapsh=6, $indent_metrics=1;
+		$new_line_before_device=0, $indent_device=1, $max_on_line_snapsh=8, $indent_metrics=1;
 	}
 	when ( /disk/i) {
 		@INDICATORS=qw/FCREAD FCWRITE IOADAPT FCXFERIN FCXFEROUT/;
 		@twice_calc=qw/pbuf/;
 		@Dev_Adapt=qw/IOADAPT DISKBUSY DISKSERV DISKWAIT DISKREAD DISKWRITE /;
+		@Custom_Metric=qw/FCRATIORW FCTOTALGB FCXFERTOTAL/;
+		$sAVG_MAX="avg";
+		$SORTS=$SORTS_tmp||"FCTOTALGB";
+		$new_line_before_device=1, $indent_device=4, $max_on_line_snapsh=5, $indent_metrics=4;
+	}
+	when ( /IO/i) {
+		@INDICATORS=qw/FCREAD FCWRITE IOADAPT FCXFERIN FCXFEROUT NET/;
+		@twice_calc=qw/pbuf/;
+		@Dev_Adapt=qw/IOADAPT DISKBUSY DISKSERV DISKWAIT DISKREAD DISKWRITE NET/;
 		@Custom_Metric=qw/FCRATIORW FCTOTALGB FCXFERTOTAL/;
 		$sAVG_MAX="avg";
 		$SORTS=$SORTS_tmp||"FCTOTALGB";
@@ -172,7 +191,7 @@ given ( $SORTS ) {
 	when(/FCREAD$/i)	{	$SORTS="FCREAD";		$sort_num="1";	}
 	when(/FCWRITE$/i)	{	$SORTS="FCWRITE";		$sort_num="1";	}
 	when(/FCXFERTOTAL$/i){	$SORTS="FCXFERTOTAL";	$sort_num="1";	}
-	when(/FCTOTALGB$/i) {	$SORTS="FCTOTALGB";		$sAVG_MAX="avg";	$sort_num="1";	}
+	when(/.*TOTALGB$/i) {	$SORTS="$_";		$sAVG_MAX="avg";	$sort_num="1";	}
 	when(/FCRATIORW$/i)	{	$SORTS="FCRATIORW";		$sAVG_MAX="max";	$sort_num="1";	}
 # Сортировка для алфовитных значений
 	when(/time$/i)		{	$SORTS="Data";			$sort_num="0";	}
@@ -261,6 +280,7 @@ sub structure_create {
 
 	@a_cap=@tmp[2..$#tmp];
 	%{$lparname->{RESULT}->{$tmp[0]}}=general_value  ;
+	# %{$lparname->{RESULT}->{$tmp[0]}{general}{$tmp[0]}}=general_value  ;
 	$lparname->{RESULT}->{$tmp[0]}{a_cap}=\@a_cap;
 	foreach ( @a_cap ) { 
 		%{$lparname->{RESULT}->{$tmp[0]}{$_}} = general_value  ;
@@ -298,19 +318,22 @@ sub search_value{
 		foreach my $indicator ( @INDICATORS ) {
 		# print $indicator,"\n";
 			my $load=$snapshots->{$snap}->{$indicator};
-			my $avgsub = sub { 
-				if ($load_sum > $result->{$indicator}->{max}) {
-						$result->{$indicator}->{max}=$load_sum;
-						$result->{$indicator}->{max_snap}=$snap;
-						$result->{$indicator}->{vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
+			my $avgsub = sub {
+				my $IND_SUB_CLASS=shift||$indicator;
+				$result->{$indicator}->{general}{$IND_SUB_CLASS}{max}=0 if (!defined $result->{$indicator}->{general}{$IND_SUB_CLASS}{max});
+				$result->{$indicator}->{general}{$IND_SUB_CLASS}{min}=99999 if (!defined $result->{$indicator}->{general}{$IND_SUB_CLASS}{min});
+				if ($load_sum > $result->{$indicator}->{general}{$IND_SUB_CLASS}{max}) {
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{max}=$load_sum;
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{max_snap}=$snap;
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
 					}
-				if ($load_sum < $result->{$indicator}->{min}) {
-						$result->{$indicator}->{min}=$load_sum;
-						$result->{$indicator}->{min_snap}=$snap;
-						$result->{$indicator}->{min_vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
+				if ($load_sum < $result->{$indicator}->{general}{$IND_SUB_CLASS}{min}) {
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{min}=$load_sum;
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{min_snap}=$snap;
+						$result->{$indicator}->{general}{$IND_SUB_CLASS}{min_vremya}=$snapshots->{$snap}->{ZZZZ}->{time};
 					}
-					$result->{$indicator}->{sum}+=$load_sum;
-					$result->{$indicator}->{count}++;
+					$result->{$indicator}->{general}{$IND_SUB_CLASS}{sum}+=$load_sum;
+					$result->{$indicator}->{general}{$IND_SUB_CLASS}{count}++;
 			};
 
 			given ($indicator) {
@@ -324,15 +347,29 @@ sub search_value{
 				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
 				when (/^PROC$/					)	{ $load_sum=$load->{"Runnable"}; 											&$avgsub}
 				when (/^LPAR/ )	{ 
-					$load_sum=$load->{"VP_User%"} + $load->{"VP_Sys%"};
-					$result->{$indicator}->{time}++ if ($load_sum > $CPU_MAX);
-					&$avgsub
+					if ( $SHOW_phys_against_entitle == $YES) {
+						$load_sum=eval(sprintf("%.2f",$load->{"PhysicalCPU"} / $load->{entitled}* 100));
+						$result->{$indicator}->{general}{'PhysAlloc%'}{time}++ if ($load_sum > $CPU_MAX);
+						&$avgsub("PhysAlloc%");
+					}
+					if ( $SHOW_entitle == $YES) {
+						$load_sum=$load->{"VP_User%"} + $load->{"VP_Sys%"};
+						$result->{$indicator}->{general}{EC}{time}++ if ($load_sum > $CPU_MAX);
+						&$avgsub("EC");
+					}
+					if ( $SHOW_PoolBusy == $YES) {
+						$load_sum=28-$load->{PoolIdle}; # 28 - число процов в пуле для lpar
+						$result->{$indicator}->{general}{PoolBusy}{time}++ if ($load_sum > $CPU_MAX);
+						# &$avgsub("PoolBusy");
+						&$avgsub("PoolBusy");
+					}
+# $load_sum=$load->{"PoolIdle"};
 				}
 				when (/^FCXFER/) {
 					foreach ( keys %{$load}) {
 						$load_sum=$load->{$_};
 						next if ($load_sum <= "0");
-						$result->{$indicator}->{avg}+=$load_sum;
+						$result->{$indicator}->{general}{$indicator}{avg}+=$load_sum;
 						&$avgsub();
 						# &$avgsub("FCXFERTOTAL"); 
 					}
@@ -366,7 +403,6 @@ sub search_value{
 					}
 				$result->{$Dev_Adapt}->{$device}->{sum}+=$load_sum;
 				$result->{$Dev_Adapt}->{$device}->{count}++;
-				# print "$snap\tmin -> $result->{$Dev_Adapt}->{$device}->{min_vremya}\tmax -> $result->{$Dev_Adapt}->{$device}->{vremya}\n" if ($device eq "fcs2_read-KB/s");
 			};
 			given ( $Dev_Adapt ) {
 # Для подсчета требуются доп действия
@@ -399,29 +435,50 @@ sub search_value{
 			when (/pbuf/) {$result->{pbuf}{avg}=$tmp_ref->{pbuf}->{"pbuf_finish"} - $tmp_ref->{pbuf}->{"pbuf_begin"}} # Скоколько накапало за один день
 		}
 	}
+	my $index=0;
 	foreach ( @Custom_Metric) {
 		my $ref=$result->{$_};
 		given ($_) {
-			when (/FCXFERTOTAL/){ $result->{$_}->{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}->{sum}+	$result->{FCXFERIN}->{sum}));	}
-			when (/FCTOTALGB/) 	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{FCWRITE}->{sum} 	+ 	$result->{FCREAD}->{sum})/1048576));					}
+			when (/FCXFERTOTAL/){ $result->{$_}->{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}->{sum}	+	$result->{FCXFERIN}->{sum}));	}
+			when (/FCTOTALGB/) 	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{FCREAD}->{sum} 	+ 	$result->{FCWRITE}-> {sum})/1048576));}
+			when (/NETTOTALGB/)	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{$_}->{sum}/1048576)));}
+			when (/SEATOTALGB/)	{ my $metrics=$_=~ s/^(.*)TOTALGB/$1/r; (skeep(\@Custom_Metric, $result,$metrics, $index) == 0 ) ?  $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{$metrics}->{sum}/1048576))) : next }
 			when (/FCRATIORW/) 	{ # Сложить IO со всех адаптеров следующих метрик FCXFERIN и FCXFEROUT
 					$result->{$_}->{max}=eval(sprintf("%.2f",$result->{FCWRITE}->{sum} * 100 /($result->{FCREAD}->{sum}+$result->{FCWRITE}->{sum})));
 					$result->{$_}->{avg}=eval(sprintf("%.2f",100-$result->{$_}->{max}));
 			}
 		}
+		$index++;
 	}
-	foreach ( @INDICATORS){
-		$result->{$_}->{"avg"}=eval(sprintf("%.2f",$result->{$_}->{"sum"} / $result->{$_}->{"count"}))
-	}
+	$index=0;
+	foreach my $ind ( @INDICATORS){
+		map  { (skeep(\@INDICATORS, $result->{$ind}{general},$_, $index) == 0 ) ? $result->{$ind}{general}{$_}->{"avg"}=eval(sprintf("%.2f",$result->{$ind}{general}{$_}->{"sum"} / $result->{$ind}{general}{$_}->{"count"})): next} keys %{$result->{$ind}{general}} ;
+		$index++;
+	} 
+	$index=0;
 	foreach my $Dev_Adapt ( @Dev_Adapt ){
+		next if ( skeep(\@Dev_Adapt, $result, $Dev_Adapt, $index) == 1 );
 		foreach (@{$result->{$Dev_Adapt}{a_cap}}) {
 			next if (! looks_like_number($result->{$Dev_Adapt}{$_}{"avg"}));
 			$result->{$Dev_Adapt}{$_}{"avg"}=eval(sprintf("%.2f",$result->{$Dev_Adapt}{$_}{sum} / $result->{$Dev_Adapt}{$_}{count}))
 		}
-	}
+		$index++;
+	} 
 # print Dumper($result);
 print "Число обработанных строк $count\n" if ($bench == 1);
 
+}
+
+sub skeep {
+	my $array=shift;
+	my $ref=shift;
+	my $metric=shift;
+	my $index=shift;
+	if (! exists $ref->{$metric}->{sum}) { 
+		# splice(@{$array}, $index, 1);
+		return 1
+	}
+	return 0;
 }
 
 sub server_strcture {
@@ -481,11 +538,14 @@ sub output {
 			elsif 	($max > $warn_max) 	{ print 			YELLOW, "/$max","$postfix)",	RESET }
 			else 					 	{ print 			GREEN,  "/$max","$postfix)",	RESET }
 		}else {print ")"}
-		print "x$time" if ($SHOW_time		== $YES) 	and (defined $time 	);
+		print "x$time" 	if ($SHOW_time		== $YES) 	and (defined $time 	);
 		print "_$snap" 	if ($SHOW_SNAPSHOTS == $YES)	and (defined $snap 	);
 		print "_$vremya"if ($SHOW_vremya	== $YES) 	and (defined $vremya);
 		return 1
-	} else {
+	} 
+	# elsif ( $EXCEL_FORMATE ==$YES) { 
+	# } 
+	else {
 		print ",$avg";
 		return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
 		print ",$max" if ($max > "0");
@@ -518,7 +578,9 @@ sub value_for_metricks {
 # Среднее критическое, Среднее предупреждение, Критическое максиммальное, Предупредение максимальное, префикс, постфикс, skip
 # =========== CPU ================
 	return("60", "50", ,"90", "60", "$device", 	"%",	"0"	)										if ( $ind eq "CPU_ALL"	);	
-	return("60", "50", ,"90", "50", "$device",	"%",	"0"	)										if ( $ind eq "LPAR" 	);
+	return("60", "50", ,"90", "50", "$device",	"",	"0"	)											if ( $ind eq "LPAR" 	);
+	return("60", "50", ,"90", "50", "$device",	"",	"0"	)											if ( $ind eq "EC" 		);
+	return("100", "100", ,"200", "200", "$device",	"",	"0"	)										if ( $ind eq 'PhysAlloc%');
 	return("60", "90", ,"40", "70", "$device",	"%",	"0"	)										if ( $ind eq "SCPU_ALL"	);
 	return("60", "90", ,"40", "70", "$device",	" core","0"	)										if ( $ind eq "PCPU_ALL"	);
 # =========== MEM ================
@@ -574,7 +636,7 @@ sub report1{
 		my $cpus=$lpar_ref->{CPUS};
 		my %metrics; # Сылки на метрики
 		my @full_array=(@INDICATORS, @twice_calc, @Dev_Adapt, @Custom_Metric);
-		my @snapshots=(@INDICATORS, @twice_calc,@Custom_Metric);
+		my @snapshots=(@INDICATORS, @Custom_Metric);
 		# my @new_arr=(@Custom_Metric,@Dev_Adapt );
 		my @keys=(keys %{$_});
 		foreach (@full_array) {if ( $_ ~~ @keys ) {$metrics{$_}=$lpar_ref->{$_}}}
@@ -587,13 +649,24 @@ sub report1{
 		if ($CVS_FROMATE==$NO)	{print " $sn $lparname","\n"x$new_line_before_device,"${delimetr}"x$indent_metrics; } 
 		else 					{print ",$sn,$lparname","\n"x$new_line_before_device;								}
 
+
 		foreach ( @snapshots ) {
-			# print "__${count}__";
+			next if ($_ eq "");
+			# print $_;
+			foreach my $general_ind (keys $metrics{$_}{general}) {
+				# print "__${count}__";
+				print "\n","$delimetr"x$indent_metrics and $count=2 if ( $count++ > $max_on_line_snapsh);
+				print ""; output($metrics{$_}{general}{$general_ind}, value_for_metricks(IND => $general_ind, CPUS => $cpus))
+				# if ($CVS_FROMATE==$NO) { print ""; output($metrics{$_}, value_for_metricks(IND => $_, CPUS => $cpus)) }
+				# else { print_cvs($metrics{$_}) }
+			}
+		}
+
+		foreach ( @twice_calc ) {
+			next if ($_ eq "");
 			print "\n","$delimetr"x$indent_metrics and $count=2 if ( $count++ > $max_on_line_snapsh);
 			print ""; output($metrics{$_}, value_for_metricks(IND => $_, CPUS => $cpus))
-			# if ($CVS_FROMATE==$NO) { print ""; output($metrics{$_}, value_for_metricks(IND => $_, CPUS => $cpus)) }
-			# else { print_cvs($metrics{$_}) }
-		}
+		}		
 		# $count=0;
 		foreach ( @Dev_Adapt ) {
 			choice_indent($_);
@@ -616,6 +689,7 @@ sub report1{
 
 	}
 }
+
 
 
 sub parse_nmon{
@@ -699,43 +773,43 @@ PARSE:	while (<NMON>) {
 				}
 			}			
 		} 
-		$tparse1 = Benchmark->new 								if ($bench == 1);
-		$tdparse = timediff($tparse1, $tparse0) 				if ($bench == 1);
-		print "PARSE NMON Files",timestr($tdparse),"\n" 		if ($bench == 1);
+																								$tparse1 = Benchmark->new 								if ($bench == 1);
+																								$tdparse = timediff($tparse1, $tparse0) 				if ($bench == 1);
+																								print "PARSE NMON Files",timestr($tdparse),"\n" 		if ($bench == 1);
 
 
-		my $tcalc0, my $tcalc1, my $tdcalc 						if ($bench == 1);
-		$tcalc0 = Benchmark->new 								if ($bench == 1);
+																								my $tcalc0, my $tcalc1, my $tdcalc 						if ($bench == 1);
+																								$tcalc0 = Benchmark->new 								if ($bench == 1);
 
 		search_value(\%lparname);
 		close NMON or warn $! ? "Error closing sort pipe: $!" : "Exit status $? from sort";
 		undef $lparname{SNAPSHOTS};
 
-		$tcalc1 = Benchmark->new  								if ($bench == 1);
-		$tdcalc = timediff($tcalc1, $tcalc0)  					if ($bench == 1);
+																								$tcalc1 = Benchmark->new  								if ($bench == 1);
+																								$tdcalc = timediff($tcalc1, $tcalc0)  					if ($bench == 1);
 
-		print "Расчет всех снепшотов:",timestr($tdcalc),"\n"  	if ($bench == 1);
+																								print "Расчет всех снепшотов:",timestr($tdcalc),"\n"  	if ($bench == 1);
 
-		my $tpush0, my $tpush1, my $tdpush  					if ($bench == 1);
-		$tpush0 = Benchmark->new  								if ($bench == 1);
+																								my $tpush0, my $tpush1, my $tdpush  					if ($bench == 1);
+																								$tpush0 = Benchmark->new  								if ($bench == 1);
 
 		push(@sorts, $lparname{RESULT});
 
-		$tpush1 = Benchmark->new  								if ($bench == 1);
-		$tdpush = timediff($tpush1, $tpush0)  					if ($bench == 1);
-		print "push NMON Files",timestr($tdpush),"\n"  			if ($bench == 1);
-		my $size_dev=scalar @Dev_Adapt  						if ($verbose == 1);
-		my $size_ind=scalar @INDICATORS  						if ($verbose == 1);
-		print "Размер @Dev_Adapt = $size_dev\n"  				if ($verbose == 1);
-		print "Размер @INDICATORS = $size_ind\n"  				if ($verbose == 1);
-		print "\n"												if ($verbose == 1);
+																								$tpush1 = Benchmark->new  								if ($bench == 1);
+																								$tdpush = timediff($tpush1, $tpush0)  					if ($bench == 1);
+																								print "push NMON Files",timestr($tdpush),"\n"  			if ($bench == 1);
+																								my $size_dev=scalar @Dev_Adapt  						if ($verbose == 1);
+																								my $size_ind=scalar @INDICATORS  						if ($verbose == 1);
+																								print "Размер @Dev_Adapt = $size_dev\n"  				if ($verbose == 1);
+																								print "Размер @INDICATORS = $size_ind\n"  				if ($verbose == 1);
+																								print "\n"												if ($verbose == 1);
 	}
 	return @sorts;
 }
 
-$tinit_fin = Benchmark->new  									if ($bench == 1);
-$tdif_init = timediff($tinit_fin, $tinit)  						if ($bench == 1);
-print "Time to prepare",timestr($tdif_init),"\n" 				if ($bench == 1);
+																								$tinit_fin = Benchmark->new  									if ($bench == 1);
+																								$tdif_init = timediff($tinit_fin, $tinit)  						if ($bench == 1);
+																								print "Time to prepare",timestr($tdif_init),"\n" 				if ($bench == 1);
 
 
 #_____________________________________MAIN_____________________________________________#
