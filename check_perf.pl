@@ -31,13 +31,17 @@ my $SHOW_vremya		="$NO";
 my $verbose="0";
 my $bench="0";
 my $CPU_MAX="99";
+my $EC_MAX="50";
+my $entitled;
 my $man = 0;
 my $help = 0;
 my $sAVG_MAX="max";
 my $CVS_FROMATE=$NO;
 my $SHOW_phys_against_entitle=$YES;
-my $SHOW_entitle=$YES;
+my $SHOW_phys=$YES;
+my $SHOW_EC=$YES;
 my $SHOW_PoolBusy=$YES;
+my $SHOW_entitled_level=$YES;
 
 # Хеши для основных данных
 my %LPAR, my %VIOS, my %SERVER;
@@ -104,6 +108,7 @@ $tstart = Benchmark->new  								if ($bench == 1);
 
 
 my $SORTS=$SORTS_tmp||"name"; #  Сортировка  
+my $SORTS1=$SORTS_tmp||"name"; #  Сортировка  
 my @custom_all=qw/FCRATIORW FCTOTALGB FCXFERTOTAL/;
 my @indicator_all=qw/LPAR CPU_ALL SCPU_ALL PCPU_ALL PAGING MEMNEW FCREAD FCWRITE FCXFERIN FCXFEROUT IOADAPT/;
 my @twice_calc_all=qw/pbuf/;
@@ -165,7 +170,7 @@ given ($type) {
 		@INDICATORS=split/ /,"$user_iden"||qw//;
 		@Dev_Adapt=split/ /,"$user_dev"||qw//;
 		@Custom_Metric=split/ /,"$user_cust"||qw//;
-		$new_line_before_device =  $no_new_line eq '0' ? '1' : '0' ; # Если нету опции -nl
+		$new_line_before_device =  $no_new_line eq '0' ? '1' : '0' ; # Если опции -nonl нету, то печатаем символ новой строки после хостнейма и перед выводом каждого девайса. 
 		$indent_device=4, $max_on_line_snapsh=5, $indent_metrics=2;
 	}
 	default {print "Неправильное значения Типа"}
@@ -174,34 +179,37 @@ given ($type) {
 # Выбор сортировки
 given ( $SORTS ) {
 # Сортировка для числовых значений
-	when(/CPU$/i)		{	$SORTS="CPU_ALL";		$sort_num="1";	}
-	when(/LPAR$/i)		{	$SORTS="LPAR";			$sort_num="1";	}
-	when(/SCPU$/i)		{	$SORTS="SCPU_ALL";		$sort_num="1";	}
-	when(/PCPU$/i)		{	$SORTS="PCPU_ALL";		$sort_num="1";	}
-	when(/MEM$/i)		{	$SORTS="MEMNEW";		$sort_num="1";	}
-	when(/pagesp$/i)	{	$SORTS="PAGING";		$sort_num="1";	}
-	when(/pbuf$/i)		{	$SORTS="pbuf";			$sort_num="1";	}
-	when(/DISKBUSY$/i)	{	$SORTS="DISKBUSY";		$sort_num="1";	}
-	when(/DISKSERV$/i)	{	$SORTS="DISKSERV";		$sort_num="1";	}
-	when(/DISKWAIT$/i)	{	$SORTS="DISKWAIT";		$sort_num="1";	}
-	when(/DISKXFER$/i)	{	$SORTS="DISKXFER";		$sort_num="1";	}
-	when(/NETERROR$/i)	{	$SORTS="NETERROR";		$sort_num="1";	}
-	when(/FCXFERIN$/i)	{	$SORTS="FCXFERIN";		$sort_num="1";	}
-	when(/FCXFEROUT$/i)	{	$SORTS="FCXFEROUT";		$sort_num="1";	}
-	when(/FCREAD$/i)	{	$SORTS="FCREAD";		$sort_num="1";	}
-	when(/FCWRITE$/i)	{	$SORTS="FCWRITE";		$sort_num="1";	}
-	when(/FCXFERTOTAL$/i){	$SORTS="FCXFERTOTAL";	$sort_num="1";	}
-	when(/.*TOTALGB$/i) {	$SORTS="$_";		$sAVG_MAX="avg";	$sort_num="1";	}
-	when(/FCRATIORW$/i)	{	$SORTS="FCRATIORW";		$sAVG_MAX="max";	$sort_num="1";	}
+	when(/CPU$/i)		{	$SORTS="CPU_ALL";		$SORTS1="CPU_ALL";		$sort_num="1";	}
+	when(/LPAR$/i)		{	$SORTS="LPAR";			$SORTS1="LPAR";			$sort_num="1";	}
+	when(/SCPU$/i)		{	$SORTS="SCPU_ALL";		$SORTS1="SCPU_ALL";		$sort_num="1";	}
+	when(/PCPU$/i)		{	$SORTS="PCPU_ALL";		$SORTS1="PCPU_ALL";		$sort_num="1";	}
+	when(/MEM$/i)		{	$SORTS="MEMNEW";		$SORTS1="MEMNEW";		$sort_num="1";	}
+	when(/pagesp$/i)	{	$SORTS="PAGING";		$SORTS1="PAGING";		$sort_num="1";	}
+	when(/pbuf$/i)		{	$SORTS="pbuf";			$SORTS1="pbuf";			$sort_num="1";	}
+	when(/DISKBUSY$/i)	{	$SORTS="DISKBUSY";		$SORTS1="DISKBUSY";		$sort_num="1";	}
+	when(/DISKSERV$/i)	{	$SORTS="DISKSERV";		$SORTS1="DISKSERV";		$sort_num="1";	}
+	when(/DISKWAIT$/i)	{	$SORTS="DISKWAIT";		$SORTS1="DISKWAIT";		$sort_num="1";	}
+	when(/DISKXFER$/i)	{	$SORTS="DISKXFER";		$SORTS1="DISKXFER";		$sort_num="1";	}
+	when(/NETERROR$/i)	{	$SORTS="NETERROR";		$SORTS1="NETERROR";		$sort_num="1";	}
+	when(/FCXFERIN$/i)	{	$SORTS="FCXFERIN";		$SORTS1="FCXFERIN";		$sort_num="1";	}
+	when(/FCXFEROUT$/i)	{	$SORTS="FCXFEROUT";		$SORTS1="FCXFEROUT";	$sort_num="1";	}
+	when(/FCREAD$/i)	{	$SORTS="FCREAD";		$SORTS1="FCREAD";		$sort_num="1";	}
+	when(/FCWRITE$/i)	{	$SORTS="FCWRITE";		$SORTS1="FCWRITE";		$sort_num="1";	}
+	when(/PhysAlloc|PhysicalCPU|EC|entitled|PoolBusy/i)	
+	{	$SORTS='LPAR';			$SORTS1='PhysAlloc%';	$sort_num="1"; 	$sAVG_MAX="max"}
+	when(/FCXFERTOTAL$/i){	$SORTS="FCXFERTOTAL";	$SORTS1="FCXFERTOTAL";	$sort_num="1";	}
+	when(/.*TOTALGB$/i) {	$SORTS="$_";			$SORTS1="$_";			$sort_num="1";	$sAVG_MAX="avg"}
+	when(/FCRATIORW$/i)	{	$SORTS="FCRATIORW";		$SORTS1="FCRATIORW";	$sort_num="1";	$sAVG_MAX="max"}
 # Сортировка для алфовитных значений
-	when(/time$/i)		{	$SORTS="Data";			$sort_num="0";	}
-	when(/serial$/i)	{	$SORTS="SN";			$sort_num="0";	}
-	when(/name$/i)		{	$SORTS="LPARNAME";		$sort_num="0";	}
+	when(/time$/i)		{	$SORTS="Data";			$SORTS1="Data";			$sort_num="0";	}
+	when(/serial$/i)	{	$SORTS="SN";			$SORTS1="SN";			$sort_num="0";	}
+	when(/name$/i)		{	$SORTS="LPARNAME";		$SORTS1="LPARNAME";		$sort_num="0";	}
 # Надеемся что пользователь знает что делает
-	default 			{ 	$SORTS=$_;				$sort_num="1";	}
+	default 			{ 	$SORTS=$_;				$SORTS1=$_;				$sort_num="1";	}
 };
 
 
+# PhysicalCPU|EC|entitled|PoolBusy
 # my $new_line, my $max_dev, my $max_snap;
 sub save_json{
 	my $array=shift;
@@ -308,11 +316,13 @@ sub search_value{
 	my $snapshots=$lparname->{SNAPSHOTS};
 	my $result=$lparname->{RESULT};
 	my $tmp_ref=$lparname->{TMP};
+	# my $config=$lparname->{CONFIG};
 	# my $result={};
 	# my $SAN=$lparname->{SAN};
 	my $load_sum;
 	my $PS=$tmp_ref->{"PageSize"};
 	my $DN=$tmp_ref->{"DeviceName"};
+	my $Entitled_Capacity=$result->{CONFIG}{HARDWARE}{BBBL}{"Entitled Capacity"};
 	my $count=1;
 	foreach my $snap (keys $snapshots) {
 		foreach my $indicator ( @INDICATORS ) {
@@ -320,7 +330,7 @@ sub search_value{
 			my $load=$snapshots->{$snap}->{$indicator};
 			my $avgsub = sub {
 				my $IND_SUB_CLASS=shift||$indicator;
-				$result->{$indicator}->{general}{$IND_SUB_CLASS}{max}=0 if (!defined $result->{$indicator}->{general}{$IND_SUB_CLASS}{max});
+				$result->{$indicator}->{general}{$IND_SUB_CLASS}{max}=0 	if (!defined $result->{$indicator}->{general}{$IND_SUB_CLASS}{max});
 				$result->{$indicator}->{general}{$IND_SUB_CLASS}{min}=99999 if (!defined $result->{$indicator}->{general}{$IND_SUB_CLASS}{min});
 				if ($load_sum > $result->{$indicator}->{general}{$IND_SUB_CLASS}{max}) {
 						$result->{$indicator}->{general}{$IND_SUB_CLASS}{max}=$load_sum;
@@ -347,23 +357,29 @@ sub search_value{
 				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
 				when (/^PROC$/					)	{ $load_sum=$load->{"Runnable"}; 											&$avgsub}
 				when (/^LPAR/ )	{ 
+					if ( $SHOW_phys == $YES) {
+						$load_sum=$load->{"PhysicalCPU"};
+						$result->{$indicator}->{general}{PhysicalCPU}{time}++ if ($load_sum > $Entitled_Capacity);
+						&$avgsub("PhysicalCPU");
+					}
 					if ( $SHOW_phys_against_entitle == $YES) {
 						$load_sum=eval(sprintf("%.2f",$load->{"PhysicalCPU"} / $load->{entitled}* 100));
 						$result->{$indicator}->{general}{'PhysAlloc%'}{time}++ if ($load_sum > $CPU_MAX);
 						&$avgsub("PhysAlloc%");
 					}
-					if ( $SHOW_entitle == $YES) {
+					if ( $SHOW_EC == $YES) {
 						$load_sum=$load->{"VP_User%"} + $load->{"VP_Sys%"};
-						$result->{$indicator}->{general}{EC}{time}++ if ($load_sum > $CPU_MAX);
+						$result->{$indicator}->{general}{EC}{time}++ if ($load_sum > $EC_MAX);
 						&$avgsub("EC");
 					}
+					if ( $SHOW_entitled_level == $YES) {
+						$load_sum=$load->{entitled};
+						&$avgsub("entitled");
+					}
 					if ( $SHOW_PoolBusy == $YES) {
-						$load_sum=28-$load->{PoolIdle}; # 28 - число процов в пуле для lpar
-						$result->{$indicator}->{general}{PoolBusy}{time}++ if ($load_sum > $CPU_MAX);
-						# &$avgsub("PoolBusy");
+						$load_sum=$result->{CONFIG}{HARDWARE}{BBBL}{'Pool CPU'}-$load->{PoolIdle}; # 
 						&$avgsub("PoolBusy");
 					}
-# $load_sum=$load->{"PoolIdle"};
 				}
 				when (/^FCXFER/) {
 					foreach ( keys %{$load}) {
@@ -417,7 +433,7 @@ sub search_value{
 				default {
 					foreach ( keys %{$load}) {
 						$load_sum=$load->{$_};
-						# print "$Dev_Adapt - $_  - $load_sum\n";
+						# print "$Dev_Adapt - $_  - $load_sum\n" if (! defined $load_sum);
 						$result->{$Dev_Adapt}->{$_}->{avg}=$load_sum and next if (! looks_like_number($load_sum));
 						$load_sum=0 if ( $load_sum eq "");
 						next if ($load_sum <= "0");
@@ -439,13 +455,13 @@ sub search_value{
 	foreach ( @Custom_Metric) {
 		my $ref=$result->{$_};
 		given ($_) {
-			when (/FCXFERTOTAL/){ $result->{$_}->{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}->{sum}	+	$result->{FCXFERIN}->{sum}));	}
-			when (/FCTOTALGB/) 	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{FCREAD}->{sum} 	+ 	$result->{FCWRITE}-> {sum})/1048576));}
-			when (/NETTOTALGB/)	{ $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{$_}->{sum}/1048576)));}
-			when (/SEATOTALGB/)	{ my $metrics=$_=~ s/^(.*)TOTALGB/$1/r; (skeep(\@Custom_Metric, $result,$metrics, $index) == 0 ) ?  $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{$metrics}->{sum}/1048576))) : next }
+			when (/FCXFERTOTAL/){ $result->{$_}->{general}{$_}{avg}=eval(sprintf("%.2f", $result->{FCXFEROUT}{general}{FCXFEROUT}->{sum}	+	$result->{FCXFERIN}{general}{FCXFERIN}->{sum}));	}
+			when (/FCTOTALGB/) 	{ $result->{$_}->{general}{$_}{avg}=eval(sprintf("%.2f",($result->{FCREAD}{general}{FCREAD}->{sum} 	+ 	$result->{FCWRITE}{general}{FCWRITE}-> {sum})/1048576));}
+			when (/NETTOTALGB/)	{ $result->{$_}->{general}{$_}{avg}=eval(sprintf("%.2f",($result->{$_}{general}{$_}->{sum}/1048576)));}
+			when (/SEATOTALGB/)	{ my $metrics=$_=~ s/^(.*)TOTALGB/$1/r; (skeep(\@Custom_Metric, $result,$metrics, $index) == 0 ) ?  $result->{$_}->{avg}=eval(sprintf("%.2f",($result->{$metrics}{general}{$metrics}->{sum}/1048576))) : next }
 			when (/FCRATIORW/) 	{ # Сложить IO со всех адаптеров следующих метрик FCXFERIN и FCXFEROUT
-					$result->{$_}->{max}=eval(sprintf("%.2f",$result->{FCWRITE}->{sum} * 100 /($result->{FCREAD}->{sum}+$result->{FCWRITE}->{sum})));
-					$result->{$_}->{avg}=eval(sprintf("%.2f",100-$result->{$_}->{max}));
+					$result->{$_}->{general}{$_}{max}=eval(sprintf("%.2f",$result->{FCWRITE}{general}{FCWRITE}->{sum} * 100 /($result->{FCREAD}{general}{FCREAD}->{sum}+$result->{FCWRITE}{general}{FCWRITE}->{sum})));
+					$result->{$_}->{general}{$_}{avg}=eval(sprintf("%.2f",100-$result->{$_}{general}{$_}->{max}));
 			}
 		}
 		$index++;
@@ -500,15 +516,15 @@ sub lparname_structure{
 	my $count=1;
 	my @ZZZZ=("time","date");
 
-	$result{LPARNAME}=		$LPAR;
-	$result{SN}=			$SerialNumber;
-	$result{Data}=			$data=~ s/-//gr;
-	$result{ID}=			"$result{Data}$LPAR";
-	$result{FILENAME}=		$filename;
-	$result{CPUS}=			$cpus;
-	$result{ZZZZ}{a_cap}=	\@ZZZZ;
-	$lparname->{SNAPSHOTS}=	\%snapshots;
-	$lparname->{RESULT}=	\%result;
+	$result{LPARNAME}=			$LPAR;
+	$result{SN}=				$SerialNumber;
+	$result{Data}=				$data=~ s/-//gr;
+	$result{ID}=				"$result{Data}$LPAR";
+	$result{FILENAME}=			$filename;
+	$result{CPUS}=				$cpus;
+	$result{ZZZZ}{a_cap}=		\@ZZZZ;
+	$lparname->{SNAPSHOTS}=		\%snapshots;
+	$lparname->{RESULT}=		\%result;
 
 	return $lparname;
 }
@@ -546,10 +562,21 @@ sub output {
 	# elsif ( $EXCEL_FORMATE ==$YES) { 
 	# } 
 	else {
+		my $time=	$indicator->{time}||0;
 		print ",$avg";
 		return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
 		print ",$max" if ($max > "0");
+		print ",$time" 	if ($SHOW_time		== $YES) and  need_count($prefix);
 	}
+}
+sub need_count{
+	my $metric=shift;
+	return 1 if ($metric eq "CPU_ALL");
+	return 1 if ($metric eq "LPAR");
+	return 1 if ($metric eq "EC");
+	return 1 if ($metric eq "PhysAlloc");
+	return 1 if ($metric eq "PhysicalCPU");
+	return 0;
 }
 
 sub save_cvs{
@@ -557,14 +584,18 @@ sub save_cvs{
 	my $twice_calc=shift;
 	my $Dev_Adapt=shift;
 	my $metrics=shift;
+	# my $need_count = sub { };
 ######## Печатаем шапку
 	print "Date,Serial,hostname";
-	map {print ",avg-$_,max-$_" } @{$INDICATORS};
+	foreach my $ind (@{$INDICATORS}){ map {print ",avg-$_,max-$_"; print ",count" if $SHOW_time == $YES and need_count($_)	} keys %{$metrics->{$ind}->{general} } };
 	map {print ",$_" } @{$twice_calc};
-	foreach my $dev (@{$Dev_Adapt}) { map { print ",dev-avg-$_,dev-max-$_" } sort @{$metrics->{$dev}->{a_cap}}};
+	foreach my $dev (@{$Dev_Adapt}) { map {print ",dev-avg-$_,dev-max-$_"	} sort @{$metrics->{$dev}->{a_cap}}};
 	print "\n";
 ######################################################### 
 
+# PhysicalCPU"
+# PhysAlloc%
+# EC
 }
 
 # Шаблоны ток для основных параметров
@@ -620,8 +651,8 @@ sub value_for_metricks {
 sub report1{ 
 	my $sorts=shift;
 	my @new_arr;
-	@new_arr=sort  { $b->{$SORTS}{$sAVG_MAX} <=> $a->{$SORTS}{$sAVG_MAX} } @{$sorts} 	if ($sort_num == 1); # SORTS - a global value , metric by sorting
-	@new_arr=sort  { $b->{$SORTS} cmp $a->{$SORTS} } @{$sorts} 							if ($sort_num == 0); # SORTS - a DATA (string line)
+	@new_arr=sort  { $b->{$SORTS}{general}{$SORTS1}{$sAVG_MAX} <=> $a->{$SORTS}{general}{$SORTS1}{$sAVG_MAX} } @{$sorts} 	if ($sort_num == 1); # SORTS - a global value , metric by sorting
+	@new_arr=sort  { $b->{$SORTS}{general}{$SORTS1} cmp $a->{$SORTS}{general}{$SORTS1} } @{$sorts} 							if ($sort_num == 0); # SORTS - a DATA (string line)
 	my $was_shown_cover=$NO;
 	my $show_cover_each_line=$NO;
 	foreach (@new_arr) {
@@ -690,6 +721,9 @@ sub report1{
 	}
 }
 
+# my prepare_for_excel{
+
+# }
 
 
 sub parse_nmon{
@@ -712,9 +746,11 @@ sub parse_nmon{
 		my $BBSEA;
 		my $finished_gather=0;
 		my $cpus;
-		
- 		if ($requiered_gather eq $YES ) { @INDICATORS=(); @twice_calc=(); @Custom_Metric=(); @Dev_Adapt=();	} # Each step we clуar array for new file if --gather 
- 		create_regex;
+		my $Entitled_Capacity;
+		my $BBBL_gather_finished=$NO;
+		my %BBBL;
+ 		if ($requiered_gather eq $YES ) { @INDICATORS=(); @twice_calc=(); @Custom_Metric=(); @Dev_Adapt=();	} # Each stap we clear array for new file if --gather 
+ 		create_regex; 
 		my $tparse0, my $tparse1, my $tdparse 				if ($bench == 1);
 		$tparse0 = Benchmark->new 							if ($bench == 1);
 PARSE:	while (<NMON>) {
@@ -724,8 +760,10 @@ PARSE:	while (<NMON>) {
 			    $cpus=$_ 		 =~ s/^AAA,cpus,\d+,(\d+)/$1/r 																and next PARSE	if /^AAA,cpus,/os;
 			    $SerialNumber=$_ =~ s/^AAA,SerialNumber,//r 																and next PARSE	if /^AAA,SerialNumber,/os;
 				$lparname=$_ 	 =~ s/^AAA,NodeName,//r																		and
-				$SERVER{$data}{$SerialNumber}{$lparname}=lparname_structure(\%lparname, $data, $SerialNumber, $lparname, $filename, $cpus)	and next PARSE 	if /^AAA,NodeName,/os;
+				$SERVER{$data}{$SerialNumber}{$lparname}=lparname_structure(\%lparname, $data, $SerialNumber, $lparname, $filename, $cpus,)	and next PARSE 	if /^AAA,NodeName,/os;
 			}
+			
+			$SERVER{$data}{$SerialNumber}{$lparname}{RESULT}{CONFIG}{HARDWARE}{"$1"}{"$3"}=$5 and next PARSE if /^(BBBL),(\w+),(\w+(\s+\w+)*?),(\d+(.\d)*)/;
 
 			# Данные о размере Paging Space
 			if ($PageSize eq 0) {
@@ -747,7 +785,7 @@ PARSE:	while (<NMON>) {
 			}
 			if ($finished_gather == $NO and $requiered_gather == $YES) {
 				# next PARSE if (/^ZZZZ/);
-		    	if  (! (/^(AAA|BBB|ZZZZ)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
+		    	if  (! (/^(AAA|BBB|ZZZZ|UARG)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
 		    	if  (/ZZZZ,T0001/)	{
 			    	$finished_gather=1; 
 					push(@INDICATORS, @indicator_all);
@@ -755,7 +793,8 @@ PARSE:	while (<NMON>) {
 					push(@twice_calc, @twice_calc_all);
 		    		create_regex;		
 		    	}
-		    	else 						{ next PARSE					    	}
+		    	else 
+		    	{ next PARSE }
 			}
 			# Сбор snapshots, выполняется только после того как создана структура
 			
@@ -773,6 +812,7 @@ PARSE:	while (<NMON>) {
 				}
 			}			
 		} 
+		# print Dumper($lparname{CONFIG}) and exit 0;
 																								$tparse1 = Benchmark->new 								if ($bench == 1);
 																								$tdparse = timediff($tparse1, $tparse0) 				if ($bench == 1);
 																								print "PARSE NMON Files",timestr($tdparse),"\n" 		if ($bench == 1);
@@ -833,9 +873,10 @@ PARSE:	while (<NMON>) {
 
 # my $treport = Benchmark->new  									if ($bench == 1);
 	report1(\@sorts) 		if ($requiered_gather==$NO);
+	# prepare_for_excel(\@sorts);
 # my $tstoprep = Benchmark->new  									if ($bench == 1);
 # my $tdreport = timediff($tstoprep, $treport)  					if ($bench == 1);
-# print "Time to report ",timestr($tdreport),"\n" 		if ($bench == 1);
+# print "Time to report ",timestr($tdreport),"\n" 					if ($bench == 1);
 
 }
 $tfinished = Benchmark->new  									if ($bench == 1);
