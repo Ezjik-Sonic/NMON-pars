@@ -9,7 +9,7 @@ use Benchmark qw(:all);
 # use Text::Table;
 use Getopt::Long;
 use Pod::Usage;
-#use JSON;
+use JSON;
 use Scalar::Util qw(looks_like_number);
 no warnings qw( experimental::smartmatch );
 
@@ -299,7 +299,7 @@ sub check_on_double_name {
 sub change_position{
 	my @data_all=@_;
 	if ( $data_all[0]  eq "TOP" )  {
-	# Некоторые структры имеют отлитчный порядок, приводим его к общиму
+	# Некоторые структры имеют отлитчный порядок, приводим его к общему
 		my $tmp1=$data_all[1],	my$tmp2=$data_all[2];
 		splice (@data_all, 1,2 , $tmp2,$tmp1);
 	}
@@ -701,7 +701,7 @@ sub value_for_metricks {
 	return("60", "90", ,"40", "70", "$device",	"%",	"0"	)										if ( $ind eq "SCPU_ALL"	);
 	return("60", "90", ,"40", "70", "$device",	" core","0"	)										if ( $ind eq "PCPU_ALL"	);
 # =========== MEM ================
-	return("80", "70", "80", "7`0", "$device", "%", "0"		)										if ( $ind eq "MEMNEW"	);
+	return("80", "70", "80", "70", "$device", "%", "0"		)										if ( $ind eq "MEMNEW"	);
 # =========== Page ===============
 	return("512", "70", "512", "70", "$device", "MB", "0")											if ( $ind eq "PAGING"	);
 # =========== Pbuf ===============
