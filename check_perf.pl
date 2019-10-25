@@ -111,7 +111,6 @@ my $tfinished;
 my $tdfinished;
 $tstart = Benchmark->new  								if ($bench == 1);
 
-					$result->{$indicator}->{general}{EC}{time}++ if ($load_sum > $CPU_ALL_MAX);
 
 my $SORTS=$SORTS_tmp||"name"; #  Сортировка  
 my $SORTS1=$SORTS_tmp||"name"; #  Сортировка  
