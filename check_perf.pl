@@ -50,7 +50,7 @@ my $CVS_FROMATE=$NO;
 
 # Хеши для основных данных
 my %LPAR, my %VIOS, my %SERVER;
-my $type="general";
+my $type="general1";
 my $delimetr="\t";
 
 # Metrics what have depends of others
@@ -399,10 +399,11 @@ sub search_value{
 				when (/^CPU_ALL/  or /^CPU\d\d/	) 	{ $load_sum=$load->{"User%"}		+	$load->{"Sys%"};					&$avgsub}
 				when (/^SCPU_ALL/ or /^SCPU\d\d/) 	{ $load_sum=$load->{"User"}			+	$load->{"Sys"}; 					&$avgsub}
 				when (/^PCPU_ALL/ or /^PCPU\d\d/) 	{ 
-					$load_sum=$load->{"User"}			+	$load->{"Sys"};
+					$load_sum=$load->{"User"} +	$load->{"Sys"};
+					$result->{$indicator}->{general}{PCPU_ALL}{time}++ if ($load_sum > $Entitled_Capacity);
 					&$avgsub;
 					}
-				when (/^MEMNEW/					)	{ $load_sum=100 - $load->{"Free%"}	-	$load->{"FScache%"};				&$avgsub} # 100 - Free - FS cache 
+				when (/^MEMNEW/					)	{ $load_sum=100 - $load->{"Free%"};											&$avgsub} # 100 - Free 
 				when (/^PAGING/					)	{ $load_sum=$PS - $load->{"$DN"}; 											&$avgsub}
 				when (/^PROC$/					)	{ $load_sum=$load->{"Runnable"}; 											&$avgsub}
 				when (/^LPAR/ )	{ 
@@ -546,6 +547,9 @@ sub search_value{
 					$result->{$_}->{general}{$_}{max}=eval(sprintf("%.2f",$result->{FCWRITE}{general}{FCWRITE}->{sum} * 100 /($result->{FCREAD}{general}{FCREAD}->{sum}+$result->{FCWRITE}{general}{FCWRITE}->{sum})));
 					$result->{$_}->{general}{$_}{avg}=eval(sprintf("%.2f",100-$result->{$_}{general}{$_}->{max}));
 			}
+			when (/Entitled/) {
+				$result->{$_}->{general}{$_}{avg}=$result->{Entitled_Capacity}
+			}
 		}
 		$index++;
 	}
@@ -583,7 +587,7 @@ sub skeep {
 sub server_strcture {
 	# AAA
 	# SerialNumber
-	# 21A84C7
+	# XXXXXX
 	# my $tmp=shift;
 	# my $SerialNumber=$tmp =~ s/^AAA,SerialNumber,//r;
 	# $SERVER{$SerialNumber}=();
