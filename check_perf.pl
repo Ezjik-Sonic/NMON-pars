@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl 
 use strict;
 use warnings;
 use Data::Dumper;
@@ -6,7 +6,6 @@ use feature qw(switch);
 use v5.16;
 use Term::ANSIColor qw(:constants); 
 use Benchmark qw(:all);
-# use Text::Table;
 use Getopt::Long;
 use Pod::Usage;
 use JSON;
@@ -968,10 +967,7 @@ PARSE:	while (<NMON>) {
 
 # my $treport = Benchmark->new  									if ($bench == 1);
 	report1(\@sorts) 		if ($requiered_gather==$NO);
-	# prepare_for_excel(\@sorts);
-# my $tstoprep = Benchmark->new  									if ($bench == 1);
-# my $tdreport = timediff($tstoprep, $treport)  					if ($bench == 1);
-# print "Time to report ",timestr($tdreport),"\n" 					if ($bench == 1);
+
 
 }
 $tfinished = Benchmark->new  									if ($bench == 1);
