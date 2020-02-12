@@ -72,7 +72,7 @@ my @CUSTOM_METRIC;
 my $dump=$FALSE;
 my $REQUIERED_GATHER=$FALSE;
 my (@files, @json);
-my ($USER_DEV=" ", $user_iden=" ", $user_cust=" "); # Если пользователь выбирает метрики вручную
+my $USER_DEV=" ", my $user_iden=" ", my $user_cust=" " ; # Если пользователь выбирает метрики вручную
 my $zero=0; # Вывод метрик с 0 
 my $FALSE_NEW_LINE=0, my $MAX_DEV, my $MAX_SNAP;
 
@@ -168,6 +168,15 @@ given ($type) {
 		$SHOW_EC="$TRUE";
 		@CUSTOM_METRIC=qw/Entitled/;
 		$NEW_LINE_BEFORE_DEVICE=0, $INDENT_DEVICE=1, $MAX_ON_LINE_SNAPSH=8, $INDENT_METRICS=1;
+	}
+	when (/buffers/i ){
+		@INDICATORS=qw//;
+		@TWICE_CALC=qw/pbuf psbuf fs_fsbuf ext_fsbuf cl_fsbuf/;
+		@Dev_Adapt=qw//;
+		$SORTS=$SORTS_tmp||"LPARNAME";
+		$SHOW_EC="$TRUE";
+		@CUSTOM_METRIC=qw//;
+		$NEW_LINE_BEFORE_DEVICE=0, $INDENT_DEVICE=1, $MAX_ON_LINE_SNAPSH=8, $INDENT_METRICS=1;	
 	}
 # More for test
 	when (/ALL/i) {
@@ -527,8 +536,13 @@ sub search_value{
 # Postprocessing	
 	foreach ( @TWICE_CALC) {
 		my $ref=$result->{$_};
+		# print Dumper($ref);
 		given ($_) {
-			when (/pbuf/) {$result->{pbuf}{avg}=$tmp_ref->{pbuf}->{"pbuf_finish"} - $tmp_ref->{pbuf}->{"pbuf_begin"}} # Скоколько накапало за один день
+			when (/pbuf/) {$result->{"pbuf"}{"avg"}=$tmp_ref->{"pbuf"}->{"pbuf_finish"} - $tmp_ref->{"pbuf"}->{"pbuf_start"}} # Скоколько накапало за один день
+			when (/psbuf/) {$result->{"psbuf"}{"avg"}=$tmp_ref->{"psbuf"}->{"psbuf_finish"} - $tmp_ref->{"psbuf"}->{"psbuf_start"}}
+			when (/fs_fsbuf/) {$result->{"fs_fsbuf"}{"avg"}=$tmp_ref->{"fs_fsbuf"}->{"fs_fsbuf_finish"} - $tmp_ref->{"fs_fsbuf"}->{"fs_fsbuf_start"}}
+			when (/cl_fsbuf/) {$result->{"cl_fsbuf"}{"avg"}=$tmp_ref->{"cl_fsbuf"}->{"cl_fsbuf_finish"} - $tmp_ref->{"cl_fsbuf"}->{"cl_fsbuf_start"}}
+			when (/ext_fsbuf/) {$result->{"ext_fsbuf"}{"avg"}=$tmp_ref->{"ext_fsbuf"}->{"ext_fsbuf_finish"} - $tmp_ref->{"ext_fsbuf"}->{"ext_fsbuf_start"}}
 		}
 	}
 	my $index=0;
@@ -646,7 +660,7 @@ sub output {
 		my $time=	$indicator->{time}||0;
 		print ",$avg";
 		return 0 if ($avg < $skip_avg) and ($max < $skip) and ( $zero == "0"); # Не печатаем если стоит флаг skip или 0 значение и нету флага zero
-		print ",$max" if ($max > "0");
+		print ",$max"	if ($max > "0");
 		print ",$time" 	if ($SHOW_time		== $TRUE) and  need_count($prefix);
 	}
 }
@@ -762,7 +776,7 @@ sub report1{
 		}
 		print "$date";
 		if ($CVS_FROMATE==$FALSE)	{print " $sn $lparname","\n"x$NEW_LINE_BEFORE_DEVICE,"${delimetr}"x$INDENT_METRICS; } 
-		else 					{print ",$sn,$lparname","\n"x$NEW_LINE_BEFORE_DEVICE;								}
+		else 						{print ",$sn,$lparname","\n"x$NEW_LINE_BEFORE_DEVICE;								}
 
 
 		foreach ( @snapshots ) {
@@ -805,10 +819,38 @@ sub report1{
 }
 
 
+sub regex_for_buffers {
+	my %buffers = (
+		"pbuf" => {
+			regexp_start_re => '^BBBP,\d+,vmstat\s-v,"\s+(\d+)\spending disk I/Os blocked with no pbuf',
+			regexp_finish_re => '^BBBP,\d+,ending\svmstat\s-v,"\s+(\d+)\spending disk I/Os blocked with no pbuf',
+		},
+		"psbuf" => {
+			regexp_start_re => '^BBBP,\d+,vmstat\s-v,"\s+(\d+)\spaging space I\/Os blocked with no psbuf',
+			regexp_finish_re => '^BBBP,\d+,ending\svmstat\s-v,"\s+(\d+)\spaging space I/Os blocked with no psbuf',
+		},
+		"fs_fsbuf" => {
+			regexp_start_re => '^BBBP,\d+,vmstat\s-v,"\s+(\d+)\sfilesystem I\/Os blocked with no fsbuf',
+			regexp_finish_re => '^BBBP,\d+,ending\svmstat\s-v,"\s+(\d+)\sfilesystem I/Os blocked with no fsbuf',
+		},
+		"cl_fsbuf" => {
+			regexp_start_re => '^BBBP,\d+,vmstat\s-v,"\s+(\d+)\sclient filesystem I/Os blocked with no fsbuf',
+			regexp_finish_re => '^BBBP,\d+,ending\svmstat\s-v,"\s+(\d+)\sclient filesystem I/Os blocked with no fsbuf',
+		},
+		"ext_fsbuf" => {
+			regexp_start_re => '^BBBP,\d+,vmstat\s-v,"\s+(\d+)\sexternal pager filesystem I\/Os blocked with no fsbuf',
+			regexp_finish_re => '^BBBP,\d+,ending\svmstat\s-v,"\s+(\d+)\sexternal pager filesystem I/Os blocked with no fsbuf',
+		},
+	);
+	return %buffers
+}
+
 sub parse_nmon{
 	my @sorts;
 	my $files= scalar @files;
 	my $cc=1;
+	my %buffers = regex_for_buffers();
+	# print Dumper(\%buffers);
 	foreach my $FILE_PATH (@files) {
 		# system("clear");
 		say "$FILE_PATH: Обработано файлов...............", $cc++, " из $files " ;
@@ -855,13 +897,13 @@ PARSE:	while (<NMON>) {
 			}
 
 			# Сбор данных по PBUF
-			if ( ! defined $pbuf_begin ) {
-				if (/^BBBP,\d+,vmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
-					$pbuf_begin=$1;
-					$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_begin"}=$pbuf_begin;
-					next PARSE;
-				}
-			}
+			# if ( ! defined $pbuf_begin ) {
+			# 	if (/^BBBP,\d+,vmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
+			# 		$pbuf_begin=$1;
+			# 		$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_begin"}=$pbuf_begin;
+			# 		next PARSE;
+			# 	}
+			# }
 			if ($finished_gather == $FALSE and $REQUIERED_GATHER == $TRUE) {
 				# next PARSE if (/^ZZZZ/);
 		    	if  (! (/^(AAA|BBB|ZZZZ|UARG)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
@@ -876,22 +918,40 @@ PARSE:	while (<NMON>) {
 		    	{ next PARSE }
 			}
 			# Сбор snapshots, выполняется только после того как создана структура
-			
+
 		    if  ( /^($regex)/os) {
 		    	# print $_,"\n";
 				if 		( /^\w+\d{0,2},(T\d?|\d+,T\d?)/os 		)	{fill_structure		(\%lparname,  $_)	}
 				elsif 	( ! /^(AAA|\w+\d{0,2},(T\d?|\d+,T\d?))/os)	{structure_create	(\%lparname,  $_)	}
 				next PARSE;
 		 	}
-			if ( ! defined $pbuf_finish ) {
-				if (/^BBBP,\d+,ending\svmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
-					$pbuf_finish=$1;
-					$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_finish"}=$pbuf_finish;
-					next PARSE;
+
+			if ( /^BBBP/ ) {
+				for my $buffer (keys %buffers) {
+					# print "$buffer \n";
+					if ( /$buffers{$buffer}{"regexp_start_re"}/m ) {
+						# print "$buffer = $1\n";
+						$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{$buffer}{"${buffer}_start"}=$1;
+					} 
+					elsif  ( /$buffers{$buffer}{"regexp_finish_re"}/m ) { 
+						# print "$buffer = $1\n";
+						$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{$buffer}{"${buffer}_finish"}=$1;
+					}
+					# next PARSE;
+
 				}
-			}			
+			}
+			
+			# if ( ! defined $pbuf_finish ) {
+			# 	if (/^BBBP,\d+,ending\svmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
+			# 		$pbuf_finish=$1;
+			# 		$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_finish"}=$pbuf_finish;
+			# 		next PARSE;
+			# 	}
+			# }			
 		} 
-		# print Dumper($lparname{CONFIG}) and exit 0;
+		# print Dumper($lparname{"TMP"}) and exit 0;
+		# print Dumper($lparname{"TMP"}) ;
 					$tparse1 = Benchmark->new 								if ($bench == 1);
 					$tdparse = timediff($tparse1, $tparse0) 				if ($bench == 1);
 					print "PARSE NMON Files",timestr($tdparse),"\n" 		if ($bench == 1);
