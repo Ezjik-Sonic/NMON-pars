@@ -107,12 +107,19 @@ my $tfinished;
 my $tdfinished;
 $tstart = Benchmark->new  								if ($bench == 1);
 
+# FCXFERTOTAL - сумма FCXFERIN и FCXFEROUT за один снепшот
+
+# my @INDICATORS=qw/LPAR CPU_ALL PAGING MEMNEW/; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS) в отличие от Dev_Adapt, 
+# создаваться хеши для каждого девайся (en0,en1 ..) не будут
+# my @TWICE_CALC=qw/pbuf/;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
+# my @Dev_Adapt=qw/DISKSERV/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
+# my @CUSTOM_METRIC=qw//; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 
 my $SORTS=$SORTS_tmp||"name"; #  Сортировка  
 my $SORTS1=$SORTS_tmp||"name"; #  Сортировка  
 my @custom_all=qw/FCRATIORW FCTOTALGB FCXFERTOTAL/;
 my @indicator_all=qw/LPAR CPU_ALL SCPU_ALL PCPU_ALL PAGING MEMNEW FCREAD FCWRITE FCXFERIN FCXFEROUT IOADAPT/;
-my @TWICE_CALC_all=qw/pbuf/;
+my @TWICE_CALC_all=qw/pbuf psbuf fs_fsbuf ext_fsbuf cl_fsbuf/;
 # Набор готовых шаблонов - Если пользователь не выбрал ни одного выводим general
 given ($type) {
 	when ( /silin/i) {
@@ -173,9 +180,10 @@ given ($type) {
 		@INDICATORS=qw//;
 		@TWICE_CALC=qw/pbuf psbuf fs_fsbuf ext_fsbuf cl_fsbuf/;
 		@Dev_Adapt=qw//;
-		$SORTS=$SORTS_tmp||"LPARNAME";
+		$SORTS=$SORTS_tmp||"date";
 		$SHOW_EC="$TRUE";
 		@CUSTOM_METRIC=qw//;
+		$SORT_NUM=2;
 		$NEW_LINE_BEFORE_DEVICE=0, $INDENT_DEVICE=1, $MAX_ON_LINE_SNAPSH=8, $INDENT_METRICS=1;	
 	}
 # More for test
@@ -215,12 +223,12 @@ given ( $SORTS ) {
 	when(/FCREAD$/i)	{	$SORTS="FCREAD";		$SORTS1="FCREAD";		$SORT_NUM="1";	}
 	when(/FCWRITE$/i)	{	$SORTS="FCWRITE";		$SORTS1="FCWRITE";		$SORT_NUM="1";	}
 	when(/PhysAlloc|PhysicalCPU|EC|entitled|PoolBusy|LPAR/i)	
-	{	$SORTS='LPAR';			$SORTS1='EC';	$SORT_NUM="1"; 	$sAVG_MAX="max"}
+						{	$SORTS='LPAR';			$SORTS1='EC';			$SORT_NUM="1"; 	$sAVG_MAX="max"}
 	when(/FCXFERTOTAL$/i){	$SORTS="FCXFERTOTAL";	$SORTS1="FCXFERTOTAL";	$SORT_NUM="1";	}
 	when(/.*TOTALGB$/i) {	$SORTS="$_";			$SORTS1="$_";			$SORT_NUM="1";	$sAVG_MAX="avg"}
 	when(/FCRATIORW$/i)	{	$SORTS="FCRATIORW";		$SORTS1="FCRATIORW";	$SORT_NUM="1";	$sAVG_MAX="max"}
 # Сортировка для алфовитных значений
-	when(/time$|date$/i)		{	$SORTS="Data";			$SORTS1="Data";			$SORT_NUM="0";	}
+	when(/time$|date$/i){	$SORTS="Data";			$SORTS1="Data";			$SORT_NUM="0";	}
 	when(/serial$/i)	{	$SORTS="SN";			$SORTS1="SN";			$SORT_NUM="0";	}
 	when(/name$/i)		{	$SORTS="LPARNAME";		$SORTS1="LPARNAME";		$SORT_NUM="0";	}
 # Надеемся что пользователь знает что делает
@@ -269,13 +277,7 @@ sub choice_indent{
 	};
 }
 
-# FCXFERTOTAL - сумма FCXFERIN и FCXFEROUT за один снепшот
 
-# my @INDICATORS=qw/LPAR CPU_ALL PAGING MEMNEW/; # Общий список индикаторов по которому должны собираться метрики для каждого такта(SNAPSHOTS) в отличие от Dev_Adapt, 
-# создаваться хеши для каждого девайся (en0,en1 ..) не будут
-# my @TWICE_CALC=qw/pbuf/;	# Список метрик для которых есть только два значения(Сбор при старте nmon и сбор при завершении nmon)
-# my @Dev_Adapt=qw/DISKSERV/; # Список метрик для девайсов и адаптеров для каждого такта(SNAPSHOTS)
-# my @CUSTOM_METRIC=qw//; # Пользовательские метрики, созданые из обратоки текущих ; При парсинге не учитываются
 my $regex;
 sub create_regex{ $regex = join ('|', @INDICATORS, @Dev_Adapt, "ZZZZ") }
 
@@ -336,10 +338,8 @@ sub fill_structure {
 	my $lparname=shift;
 	my $snapshots=\%{$lparname->{SNAPSHOTS}};
 	my $result=\%{$lparname->{RESULT}};
-	# my @data_all=split/,/,"@_";
 	my @data_all=change_position(split/,/,"@_");
 	my %data;
-	# @data_all=change_position(\@data_all);
 
 	my @a_cap=@{$result->{$data_all[0]}->{a_cap}};
 	my $snap_num=$data_all[1] ;
@@ -364,9 +364,6 @@ sub search_value{
 	my $snapshots=$lparname->{SNAPSHOTS};
 	my $result=$lparname->{RESULT};
 	my $tmp_ref=$lparname->{TMP};
-	# my $config=$lparname->{CONFIG};
-	# my $result={};
-	# my $SAN=$lparname->{SAN};
 	my $load_sum;
 	my $PS=$tmp_ref->{"PageSize"};
 	my $DN=$tmp_ref->{"DeviceName"};
@@ -538,11 +535,9 @@ sub search_value{
 		my $ref=$result->{$_};
 		# print Dumper($ref);
 		given ($_) {
-			when (/pbuf/) {$result->{"pbuf"}{"avg"}=$tmp_ref->{"pbuf"}->{"pbuf_finish"} - $tmp_ref->{"pbuf"}->{"pbuf_start"}} # Скоколько накапало за один день
-			when (/psbuf/) {$result->{"psbuf"}{"avg"}=$tmp_ref->{"psbuf"}->{"psbuf_finish"} - $tmp_ref->{"psbuf"}->{"psbuf_start"}}
-			when (/fs_fsbuf/) {$result->{"fs_fsbuf"}{"avg"}=$tmp_ref->{"fs_fsbuf"}->{"fs_fsbuf_finish"} - $tmp_ref->{"fs_fsbuf"}->{"fs_fsbuf_start"}}
-			when (/cl_fsbuf/) {$result->{"cl_fsbuf"}{"avg"}=$tmp_ref->{"cl_fsbuf"}->{"cl_fsbuf_finish"} - $tmp_ref->{"cl_fsbuf"}->{"cl_fsbuf_start"}}
-			when (/ext_fsbuf/) {$result->{"ext_fsbuf"}{"avg"}=$tmp_ref->{"ext_fsbuf"}->{"ext_fsbuf_finish"} - $tmp_ref->{"ext_fsbuf"}->{"ext_fsbuf_start"}}
+			# Если секции BBBL ending - нет,то возвращаем отрицательное значение. 
+			# Такое происходит, когда сбор НМОН был прерван или собран раньше времени
+			default	{$result->{$_}{"avg"}=$tmp_ref->{$_}->{"${_}_finish"}||0 - $tmp_ref->{$_}->{"${_}_start"}}
 		}
 	}
 	my $index=0;
@@ -896,14 +891,6 @@ PARSE:	while (<NMON>) {
 				}
 			}
 
-			# Сбор данных по PBUF
-			# if ( ! defined $pbuf_begin ) {
-			# 	if (/^BBBP,\d+,vmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
-			# 		$pbuf_begin=$1;
-			# 		$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_begin"}=$pbuf_begin;
-			# 		next PARSE;
-			# 	}
-			# }
 			if ($finished_gather == $FALSE and $REQUIERED_GATHER == $TRUE) {
 				# next PARSE if (/^ZZZZ/);
 		    	if  (! (/^(AAA|BBB|ZZZZ|UARG)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
@@ -928,30 +915,19 @@ PARSE:	while (<NMON>) {
 
 			if ( /^BBBP/ ) {
 				for my $buffer (keys %buffers) {
-					# print "$buffer \n";
 					if ( /$buffers{$buffer}{"regexp_start_re"}/m ) {
-						# print "$buffer = $1\n";
 						$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{$buffer}{"${buffer}_start"}=$1;
 					} 
 					elsif  ( /$buffers{$buffer}{"regexp_finish_re"}/m ) { 
-						# print "$buffer = $1\n";
 						$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{$buffer}{"${buffer}_finish"}=$1;
 					}
-					# next PARSE;
 
 				}
 			}
 			
-			# if ( ! defined $pbuf_finish ) {
-			# 	if (/^BBBP,\d+,ending\svmstat\s-v,\"\s+(\d+)\spending disk I\/Os blocked with no pbuf\"/os) {
-			# 		$pbuf_finish=$1;
-			# 		$SERVER{$data}{$SerialNumber}{$lparname}{"TMP"}{"pbuf"}{"pbuf_finish"}=$pbuf_finish;
-			# 		next PARSE;
-			# 	}
-			# }			
-		} 
-		# print Dumper($lparname{"TMP"}) and exit 0;
-		# print Dumper($lparname{"TMP"}) ;
+
+					# print Dumper($lparname{"TMP"}) and exit 0;
+					# print Dumper($lparname{"TMP"}) ;
 					$tparse1 = Benchmark->new 								if ($bench == 1);
 					$tdparse = timediff($tparse1, $tparse0) 				if ($bench == 1);
 					print "PARSE NMON Files",timestr($tdparse),"\n" 		if ($bench == 1);
@@ -960,7 +936,7 @@ PARSE:	while (<NMON>) {
 					my $tcalc0, my $tcalc1, my $tdcalc 						if ($bench == 1);
 					$tcalc0 = Benchmark->new 								if ($bench == 1);
 
-# print Dumper(\%lparname);
+		# print Dumper(\%lparname);
 		search_value(\%lparname);
 		close NMON or warn $! ? "Error closing sort pipe: $!" : "Exit status $? from sort";
 		undef $lparname{SNAPSHOTS};
