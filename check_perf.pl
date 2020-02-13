@@ -201,7 +201,7 @@ given ($type) {
 		$NEW_LINE_BEFORE_DEVICE =  $FALSE_NEW_LINE eq '0' ? '1' : '0' ; # Если опции -nonl нету, то печатаем символ новой строки после хостнейма и перед выводом каждого девайса. 
 		$INDENT_DEVICE=4, $MAX_ON_LINE_SNAPSH=5, $INDENT_METRICS=2;
 	}
-	default {print "Неправильное значения Типа"}
+	default {print "Неправильное значения Типа\n"}
 };
 
 # Выбор сортировки
@@ -508,7 +508,9 @@ sub search_value{
 					foreach my $PID ( keys %{$load}) {
 						foreach ( keys %{$load->{$PID}}) {
 							$load_sum=$load->{$PID}->{$_};
-							$result->{$Dev_Adapt}->{$PID}->{$_}->{avg}+=$load_sum and next if (! looks_like_number($load_sum));
+							# print " load_sum $load_sum \n" ;
+
+							$result->{$Dev_Adapt}->{$PID}->{$_}->{avg}=$load_sum and next if (! looks_like_number($load_sum));
 							$load_sum=0 if ( $load_sum eq "");
 							next if ($load_sum <= "0");
 							&$TOPSUB($PID,$_) 
@@ -534,6 +536,7 @@ sub search_value{
 	foreach ( @TWICE_CALC) {
 		my $ref=$result->{$_};
 		# print Dumper($ref);
+		print "_ -> $_ \n";
 		given ($_) {
 			# Если секции BBBL ending - нет,то возвращаем отрицательное значение. 
 			# Такое происходит, когда сбор НМОН был прерван или собран раньше времени
@@ -891,27 +894,6 @@ PARSE:	while (<NMON>) {
 				}
 			}
 
-			if ($finished_gather == $FALSE and $REQUIERED_GATHER == $TRUE) {
-				# next PARSE if (/^ZZZZ/);
-		    	if  (! (/^(AAA|BBB|ZZZZ|UARG)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
-		    	if  (/ZZZZ,T0001/)	{
-			    	$finished_gather=1; 
-					push(@INDICATORS, @indicator_all);
-					push(@CUSTOM_METRIC, @custom_all);
-					push(@TWICE_CALC, @TWICE_CALC_all);
-		    		create_regex;		
-		    	}
-		    	else 
-		    	{ next PARSE }
-			}
-			# Сбор snapshots, выполняется только после того как создана структура
-
-		    if  ( /^($regex)/os) {
-		    	# print $_,"\n";
-				if 		( /^\w+\d{0,2},(T\d?|\d+,T\d?)/os 		)	{fill_structure		(\%lparname,  $_)	}
-				elsif 	( ! /^(AAA|\w+\d{0,2},(T\d?|\d+,T\d?))/os)	{structure_create	(\%lparname,  $_)	}
-				next PARSE;
-		 	}
 
 			if ( /^BBBP/ ) {
 				for my $buffer (keys %buffers) {
@@ -924,8 +906,33 @@ PARSE:	while (<NMON>) {
 
 				}
 			}
-			
 
+			if ($finished_gather == $FALSE and $REQUIERED_GATHER == $TRUE) {
+				# next PARSE if (/^ZZZZ/);
+		    	if  (! (/^(AAA|BBB|ZZZZ|UARG)/) ) 	{structure_create(\%lparname,  $_, 1); 	}
+		    	if  (/ZZZZ,T0001/)	{
+			    	$finished_gather=1;
+					push(@INDICATORS, @indicator_all);
+					push(@CUSTOM_METRIC, @custom_all);
+					push(@TWICE_CALC, @TWICE_CALC_all);
+		    		create_regex;		
+		    	}
+		    	else 
+		    	{ next PARSE }
+			}
+
+			# Сбор snapshots, выполняется только после того как создана структура
+
+		    if  ( /^($regex)/os) {
+		    	# print $_,"\n";
+				if 		( /^\w+\d{0,2},(T\d?|\d+,T\d?)/os 		)	{fill_structure		(\%lparname,  $_)	}
+				elsif 	( ! /^(AAA|\w+\d{0,2},(T\d?|\d+,T\d?))/os)	{structure_create	(\%lparname,  $_)	}
+				next PARSE;
+		 	}
+
+
+			
+		} 
 					# print Dumper($lparname{"TMP"}) and exit 0;
 					# print Dumper($lparname{"TMP"}) ;
 					$tparse1 = Benchmark->new 								if ($bench == 1);
